@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Second Brain Setup</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="top">
+        <p class="eyebrow">local-first memory for Claude Code</p>
+        <h1 class="font-display">Second Brain Setup</h1>
+        <p class="lede">
+          Four quiet steps. Your sessions land in a Markdown vault on this Mac.
+        </p>
+      </header>
+
+      <section class="vault-bar" aria-label="Vault location">
+        <label for="vault-path">Vault folder</label>
+        <div class="vault-row">
+          <input
+            id="vault-path"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <button type="button" id="btn-browse" class="btn ghost">Browse</button>
+        </div>
+      </section>
+
+      <ol class="steps" id="steps">
+        <!-- 1 -->
+        <li class="step" data-step="1" id="step-1">
+          <div class="step-head">
+            <span class="num">1</span>
+            <div class="step-copy">
+              <h2>Check your machine</h2>
+              <p class="muted">Claude Code, git, and node.</p>
+            </div>
+            <button type="button" id="btn-check" class="btn primary">Check</button>
+          </div>
+          <ul class="prereq-list" id="prereq-list" hidden></ul>
+          <p class="step-note" id="prereq-note" hidden></p>
+        </li>
+
+        <!-- 2 -->
+        <li class="step" data-step="2" id="step-2">
+          <div class="step-head">
+            <span class="num">2</span>
+            <div class="step-copy">
+              <h2>Install the plugin</h2>
+              <p class="muted">Copies hooks into Claude Code and seeds the vault.</p>
+            </div>
+            <button type="button" id="btn-install" class="btn primary" disabled>
+              Run
+            </button>
+          </div>
+          <pre class="log" id="install-log" aria-live="polite" hidden></pre>
+        </li>
+
+        <!-- 3 -->
+        <li class="step" data-step="3" id="step-3">
+          <div class="step-head">
+            <span class="num">3</span>
+            <div class="step-copy">
+              <h2>Get Obsidian</h2>
+              <p class="muted">Optional, but the nicest way to browse the vault.</p>
+            </div>
+            <button type="button" id="btn-obsidian" class="btn primary" disabled>
+              Install
+            </button>
+          </div>
+          <p class="step-note" id="obsidian-note" hidden></p>
+        </li>
+
+        <!-- 4 -->
+        <li class="step" data-step="4" id="step-4">
+          <div class="step-head">
+            <span class="num">4</span>
+            <div class="step-copy">
+              <h2>Open your vault</h2>
+              <p class="muted">Deep-link into Obsidian, or reveal the folder.</p>
+            </div>
+            <button type="button" id="btn-open" class="btn primary" disabled>
+              Open
+            </button>
+          </div>
+          <p class="step-note" id="open-note" hidden></p>
+        </li>
+
+        <!-- v2 stub: MCP server setup — skipped in v1 -->
+      </ol>
+
+      <section class="done" id="done" hidden>
+        <h2 class="font-display">You're set.</h2>
+        <p>
+          Start a Claude Code session — it remembers now.
+        </p>
+        <p class="muted small">
+          Restart Claude Code (or open a new session) so the hooks load.
+        </p>
+      </section>
+    </div>
+  </body>
+</html>
