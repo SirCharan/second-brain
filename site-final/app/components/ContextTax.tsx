@@ -1,21 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
- * Animated before/after context story — phases from second-brain-cinema,
- * layout/copy aligned to the final landing screenshot.
+ * Scroll-driven context story.
+ * As the user scrolls through this chapter, left panel fills (tax),
+ * right panel stays lean while the vault writes notes to disk.
+ * Reduced-motion: static mid-story frame, no sticky track.
  */
-
-type Phase = "fill" | "pressure" | "choice" | "aftermath";
-
-const PHASE_ORDER: Phase[] = ["fill", "pressure", "choice", "aftermath"];
-const PHASE_MS: Record<Phase, number> = {
-  fill: 3600,
-  pressure: 3000,
-  choice: 3200,
-  aftermath: 3800,
-};
 
 const MESSAGES = [
   "debugging rate-limit on the API…",
@@ -37,242 +29,306 @@ const VAULT_NOTES: VaultNote[] = [
   { path: "lessons/retries.md", kb: 1.2 },
 ];
 
-type PanelState = {
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
+
+function easeInOut(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
+}
+
+type SideState = {
   ctxPct: number;
   memPct: number;
-  tokensWasted: number;
-  lines: string[];
-  vault: VaultNote[];
+  vaultCount: number;
   vaultKb: number;
   writeEvent: string | null;
   badge: string;
   badgeTone: "neutral" | "warn" | "danger" | "ok";
+  lines: string[];
   action: string | null;
   footer: string;
+  tokensWasted: number;
 };
 
-function sumKb(notes: VaultNote[]) {
-  return Math.round(notes.reduce((s, n) => s + n.kb, 0) * 10) / 10;
-}
+/** Map scroll progress 0→1 into both panel states (continuous fill). */
+function stateAt(progress: number): { bad: SideState; good: SideState } {
+  const p = clamp01(progress);
+  const e = easeInOut(p);
 
-function withoutState(phase: Phase): PanelState {
-  switch (phase) {
-    case "fill":
-      return {
-        ctxPct: 52,
-        memPct: 45,
-        tokensWasted: 0,
-        lines: MESSAGES.slice(0, 3),
-        vault: [],
-        vaultKb: 0,
-        writeEvent: null,
-        badge: "session working",
-        badgeTone: "neutral",
-        action: null,
-        footer: "History stays in the chat. Nothing hits disk.",
-      };
-    case "pressure":
-      return {
-        ctxPct: 78,
-        memPct: 82,
-        tokensWasted: 18_400,
-        lines: MESSAGES.slice(0, 5),
-        vault: [],
-        vaultKb: 0,
-        writeEvent: null,
-        badge: "past 50% · tax starts",
-        badgeTone: "warn",
-        action: null,
-        footer: "Every query re-sends the fat history. Vault still empty.",
-      };
-    case "choice":
-      return {
-        ctxPct: 96,
-        memPct: 100,
-        tokensWasted: 38_200,
-        lines: MESSAGES,
-        vault: [],
-        vaultKb: 0,
-        writeEvent: null,
-        badge: "must compact or /clear",
-        badgeTone: "danger",
-        action: "compacting… · or $ /clear",
-        footer: "Slow, lossy, or wipe. Knowledge never left the window.",
-      };
-    case "aftermath":
-      return {
-        ctxPct: 6,
-        memPct: 0,
-        tokensWasted: 52_800,
-        lines: ["(window empty)", "who were we again?"],
-        vault: [],
-        vaultKb: 0,
-        writeEvent: null,
-        badge: "amnesia + bill",
-        badgeTone: "danger",
-        action: null,
-        footer: "Tokens spent. Plot gone. Vault still empty.",
-      };
+  // ── WITHOUT: window fills until collapse ──
+  let badCtx: number;
+  let badMem: number;
+  let badBadge: SideState["badge"];
+  let badTone: SideState["badgeTone"];
+  let badLines: string[];
+  let badAction: string | null = null;
+  let badFooter: string;
+  let badWaste: number;
+
+  if (p < 0.28) {
+    const t = e / 0.28;
+    badCtx = lerp(32, 58, t);
+    badMem = lerp(22, 48, t);
+    badBadge = "session working";
+    badTone = "neutral";
+    badLines = MESSAGES.slice(0, 2 + Math.floor(t * 1));
+    badFooter = "History stays in the chat. Nothing hits disk.";
+    badWaste = 0;
+  } else if (p < 0.55) {
+    const t = (e - 0.28) / 0.27;
+    badCtx = lerp(58, 82, t);
+    badMem = lerp(48, 88, t);
+    badBadge = "past 50% · tax starts";
+    badTone = "warn";
+    badLines = MESSAGES.slice(0, 3 + Math.floor(t * 2));
+    badFooter = "Every query re-sends the fat history. Vault still empty.";
+    badWaste = Math.round(lerp(0, 18_400, t));
+  } else if (p < 0.78) {
+    const t = (e - 0.55) / 0.23;
+    badCtx = lerp(82, 97, t);
+    badMem = lerp(88, 100, t);
+    badBadge = "must compact or /clear";
+    badTone = "danger";
+    badLines = MESSAGES;
+    badAction = "compacting… · or $ /clear";
+    badFooter = "Slow, lossy, or wipe. Knowledge never left the window.";
+    badWaste = Math.round(lerp(18_400, 38_200, t));
+  } else {
+    const t = (e - 0.78) / 0.22;
+    badCtx = lerp(97, 6, t);
+    badMem = lerp(100, 0, t);
+    badBadge = "amnesia + bill";
+    badTone = "danger";
+    badLines = ["(window empty)", "who were we again?"];
+    badFooter = "Tokens spent. Plot gone. Vault still empty.";
+    badWaste = Math.round(lerp(38_200, 52_800, t));
   }
-}
 
-function withState(phase: Phase): PanelState {
-  switch (phase) {
-    case "fill": {
-      const vault = VAULT_NOTES.slice(0, 2);
-      return {
-        ctxPct: 28,
-        memPct: 0,
-        tokensWasted: 0,
-        lines: MESSAGES.slice(0, 3),
-        vault,
-        vaultKb: sumKb(vault),
-        writeEvent: "→ wrote Daily/2026-07-21.md",
-        badge: "capturing",
-        badgeTone: "ok",
-        action: null,
-        footer: "Work happens. Notes land in Obsidian. Session stays thin.",
-      };
-    }
-    case "pressure": {
-      const vault = VAULT_NOTES.slice(0, 4);
-      return {
-        ctxPct: 31,
-        memPct: 0,
-        tokensWasted: 0,
-        lines: MESSAGES.slice(0, 4),
-        vault,
-        vaultKb: sumKb(vault),
-        writeEvent: "→ wrote auth-flow.md · deploy-r2.md",
-        badge: "vault rising",
-        badgeTone: "ok",
-        action: "session flat · vault +8.9 KB",
-        footer: "More knowledge. Not more context. Under the 50% tax line.",
-      };
-    }
-    case "choice": {
-      const vault = VAULT_NOTES.slice(0, 6);
-      return {
-        ctxPct: 14,
-        memPct: 0,
-        tokensWasted: 0,
-        lines: ["$ /clear", "context freed", "vault untouched"],
-        vault,
-        vaultKb: sumKb(vault),
-        writeEvent: "→ dump complete · 6 notes on disk",
-        badge: "clear is free",
-        badgeTone: "ok",
-        action: "dumped → Obsidian vault",
-        footer: "Window empties. Disk keeps every decision.",
-      };
-    }
-    case "aftermath": {
-      const vault = VAULT_NOTES;
-      return {
-        ctxPct: 19,
-        memPct: 0,
-        tokensWasted: 0,
-        lines: [
-          "new session · Claude",
-          "↳ recalled acme/rate-limit.md ✓",
-          "↳ recalled auth-flow.md ✓",
-        ],
-        vault,
-        vaultKb: sumKb(vault),
-        writeEvent: "← recall from vault (not re-typed)",
-        badge: "recalling",
-        badgeTone: "ok",
-        action: null,
-        footer: "Pick up cold. Only the relevant notes re-enter the window.",
-      };
-    }
+  // ── WITH: vault fills, session stays under tax line ──
+  let goodCtx: number;
+  let goodBadge: SideState["badge"];
+  let goodTone: SideState["badgeTone"] = "ok";
+  let goodLines: string[];
+  let goodAction: string | null = null;
+  let goodFooter: string;
+  let vaultCount: number;
+  let writeEvent: string | null;
+
+  if (p < 0.22) {
+    const t = e / 0.22;
+    goodCtx = lerp(18, 28, t);
+    vaultCount = t > 0.35 ? 1 : 0;
+    if (t > 0.7) vaultCount = 2;
+    goodBadge = "capturing";
+    goodLines = MESSAGES.slice(0, 2 + Math.floor(t));
+    writeEvent = vaultCount > 0 ? `→ wrote ${VAULT_NOTES[vaultCount - 1].path}` : null;
+    goodFooter = "Work happens. Notes land in Obsidian. Session stays thin.";
+  } else if (p < 0.5) {
+    const t = (e - 0.22) / 0.28;
+    goodCtx = lerp(28, 32, t);
+    vaultCount = 2 + Math.floor(t * 2); // 2→4
+    goodBadge = "vault rising";
+    goodLines = MESSAGES.slice(0, 3 + Math.floor(t));
+    goodAction = "session flat · vault growing";
+    writeEvent = `→ wrote ${VAULT_NOTES[Math.min(vaultCount - 1, VAULT_NOTES.length - 1)].path}`;
+    goodFooter = "More knowledge. Not more context. Under the 50% tax line.";
+  } else if (p < 0.72) {
+    const t = (e - 0.5) / 0.22;
+    goodCtx = lerp(32, 14, t);
+    vaultCount = 4 + Math.floor(t * 2); // 4→6
+    goodBadge = "clear is free";
+    goodLines = ["$ /clear", "context freed", "vault untouched"];
+    goodAction = "dumped → Obsidian vault";
+    writeEvent = "→ dump complete · notes on disk";
+    goodFooter = "Window empties. Disk keeps every decision.";
+  } else {
+    const t = (e - 0.72) / 0.28;
+    goodCtx = lerp(14, 22, t);
+    vaultCount = 6;
+    goodBadge = "recalling";
+    goodLines = [
+      "new session · Claude",
+      "↳ recalled acme/rate-limit.md ✓",
+      "↳ recalled auth-flow.md ✓",
+    ];
+    writeEvent = "← recall from vault (not re-typed)";
+    goodFooter = "Pick up cold. Only the relevant notes re-enter the window.";
   }
-}
 
-function prefersReducedMotion() {
-  if (typeof window === "undefined") return true;
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  vaultCount = Math.min(VAULT_NOTES.length, vaultCount);
+  const vault = VAULT_NOTES.slice(0, vaultCount);
+  const vaultKb = Math.round(vault.reduce((s, n) => s + n.kb, 0) * 10) / 10;
+
+  return {
+    bad: {
+      ctxPct: badCtx,
+      memPct: badMem,
+      vaultCount: 0,
+      vaultKb: 0,
+      writeEvent: null,
+      badge: badBadge,
+      badgeTone: badTone,
+      lines: badLines,
+      action: badAction,
+      footer: badFooter,
+      tokensWasted: badWaste,
+    },
+    good: {
+      ctxPct: goodCtx,
+      memPct: 0,
+      vaultCount,
+      vaultKb,
+      writeEvent,
+      badge: goodBadge,
+      badgeTone: goodTone,
+      lines: goodLines,
+      action: goodAction,
+      footer: goodFooter,
+      tokensWasted: 0,
+    },
+  };
 }
 
 export default function ContextTax() {
-  const [phase, setPhase] = useState<Phase>("fill");
-  const [tick, setTick] = useState(0);
+  const trackRef = useRef<HTMLElement>(null);
+  const [progress, setProgress] = useState(0.12);
   const [reduced, setReduced] = useState(false);
 
   useEffect(() => {
-    setReduced(prefersReducedMotion());
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onMq = () => setReduced(mq.matches);
+    mq.addEventListener("change", onMq);
+    return () => mq.removeEventListener("change", onMq);
   }, []);
 
   useEffect(() => {
     if (reduced) {
-      setPhase("fill");
+      setProgress(0.4);
       return;
     }
-    let cancelled = false;
-    let phaseIdx = 0;
-    let timer = 0;
 
-    const run = () => {
-      if (cancelled) return;
-      const p = PHASE_ORDER[phaseIdx];
-      setPhase(p);
-      setTick((t) => t + 1);
-      timer = window.setTimeout(() => {
-        phaseIdx = (phaseIdx + 1) % PHASE_ORDER.length;
-        run();
-      }, PHASE_MS[p]);
+    const el = trackRef.current;
+    if (!el) return;
+
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const rect = el.getBoundingClientRect();
+      const trackH = el.offsetHeight;
+      const viewH = window.innerHeight;
+      // progress 0 when sticky block hits top, 1 when track end reaches bottom
+      const scrolled = -rect.top;
+      const range = Math.max(1, trackH - viewH);
+      setProgress(clamp01(scrolled / range));
     };
 
-    run();
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
     return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
     };
   }, [reduced]);
 
-  const without = withoutState(phase);
-  const withSb = withState(phase);
+  const { bad, good } = stateAt(progress);
+  const phaseLabel =
+    progress < 0.28
+      ? "01 · fill"
+      : progress < 0.55
+        ? "02 · pressure"
+        : progress < 0.78
+          ? "03 · choice"
+          : "04 · aftermath";
 
   return (
-    <section id="context" className="border-t border-line px-6 py-24 sm:px-10 sm:py-28">
-      <div className="mx-auto max-w-6xl">
-        <div className="max-w-2xl">
-          <p className="font-mono text-[11px] tracking-[0.14em] text-ink-faint uppercase">
-            The context tax
-          </p>
-          <h2 className="mt-3 font-display text-[clamp(2rem,4vw,3.1rem)] leading-[1.05]">
-            Fill. Compact. Clear.
-            <br />
-            <span className="text-ink-dim">Or write it to disk.</span>
-          </h2>
-          <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-dim">
-            Long chats re-send their history on every turn. Past half full, you pay for
-            bloat you already know. second-brain puts the hard parts in Markdown so the
-            vault grows and the window stays light.
+    <section
+      id="context"
+      ref={trackRef}
+      className={
+        reduced
+          ? "border-t border-line"
+          : "relative border-t border-line min-h-[260vh]"
+      }
+    >
+      <div
+        className={
+          reduced
+            ? "px-6 py-24 sm:px-10 sm:py-28"
+            : "sticky top-0 flex min-h-svh flex-col justify-center px-6 py-16 sm:px-10 sm:py-20"
+        }
+      >
+        <div className="mx-auto w-full max-w-6xl">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="max-w-2xl">
+              <p className="font-mono text-[11px] tracking-[0.14em] text-ink-faint uppercase">
+                The context tax
+              </p>
+              <h2 className="mt-3 font-display text-[clamp(2rem,4vw,3.1rem)] leading-[1.05]">
+                Fill. Compact. Clear.
+                <br />
+                <span className="text-ink-dim">Or write it to disk.</span>
+              </h2>
+              <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-dim">
+                Long chats re-send their history on every turn. Past half full, you pay
+                for bloat you already know. second-brain puts the hard parts in Markdown
+                so the vault grows and the window stays light.
+              </p>
+            </div>
+
+            {/* scroll progress meter */}
+            {!reduced && (
+              <div className="mb-1 w-full max-w-[11rem] sm:w-40">
+                <div className="flex items-center justify-between font-mono text-[10px] text-ink-faint">
+                  <span>{phaseLabel}</span>
+                  <span>{Math.round(progress * 100)}%</span>
+                </div>
+                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-2">
+                  <div
+                    className="h-full rounded-full bg-accent transition-[width] duration-100 ease-out"
+                    style={{ width: `${progress * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 font-mono text-[10px] text-ink-faint">
+                  scroll to play
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-10 grid gap-4 lg:grid-cols-2">
+            <StoryPanel
+              tone="bad"
+              eyebrow="Without second-brain"
+              title="Everything lives in the window"
+              state={bad}
+            />
+            <StoryPanel
+              tone="good"
+              eyebrow="With second-brain"
+              title="Vault rises. Session stays light."
+              state={good}
+              notes={VAULT_NOTES.slice(0, good.vaultCount)}
+            />
+          </div>
+
+          <p className="mt-6 max-w-2xl text-sm text-ink-faint">
+            {reduced
+              ? "Same work both sides. Left: the session swells. Right: notes land in Obsidian."
+              : "Scroll to run the loop. Left fills the window. Right writes the vault and stays under the tax line."}
           </p>
         </div>
-
-        <div className="mt-14 grid gap-4 lg:grid-cols-2">
-          <StoryPanel
-            tone="bad"
-            eyebrow="Without second-brain"
-            title="Everything lives in the window"
-            state={without}
-            tick={tick}
-          />
-          <StoryPanel
-            tone="good"
-            eyebrow="With second-brain"
-            title="Vault rises. Session stays light."
-            state={withSb}
-            tick={tick}
-          />
-        </div>
-
-        <p className="mt-6 max-w-2xl text-sm text-ink-faint">
-          Loop is automatic. Same work both sides. Left: the session swells. Right:
-          notes stream into Obsidian while context stays under the tax line.
-        </p>
       </div>
     </section>
   );
@@ -283,20 +339,26 @@ function StoryPanel({
   eyebrow,
   title,
   state,
-  tick,
+  notes = [],
 }: {
   tone: "bad" | "good";
   eyebrow: string;
   title: string;
-  state: PanelState;
-  tick: number;
+  state: SideState;
+  notes?: VaultNote[];
 }) {
   const barTone =
-    state.ctxPct >= 90 ? "danger" : state.ctxPct > 50 ? "warn" : tone === "good" ? "ok" : "neutral";
+    state.ctxPct >= 90
+      ? "danger"
+      : state.ctxPct > 50
+        ? "warn"
+        : tone === "good"
+          ? "ok"
+          : "neutral";
 
   return (
     <article
-      className={`flex min-h-[520px] flex-col rounded-2xl border p-6 sm:p-7 ${
+      className={`flex min-h-[480px] flex-col rounded-2xl border p-5 sm:min-h-[520px] sm:p-7 ${
         tone === "good"
           ? "border-line-strong bg-surface/60 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-accent)_12%,transparent)]"
           : "border-line bg-surface/40"
@@ -311,12 +373,12 @@ function StoryPanel({
           >
             {eyebrow}
           </p>
-          <h3 className="mt-1.5 font-display text-xl leading-snug">{title}</h3>
+          <h3 className="mt-1.5 font-display text-lg leading-snug sm:text-xl">{title}</h3>
         </div>
         <Badge label={state.badge} tone={state.badgeTone} />
       </div>
 
-      <div className="mt-8 space-y-5">
+      <div className="mt-7 space-y-4">
         <Bar
           label="session / context"
           value={state.ctxPct}
@@ -336,7 +398,7 @@ function StoryPanel({
             value={Math.min(100, state.vaultKb * 6)}
             maxLabel={
               state.vaultKb > 0
-                ? `${state.vault.length} notes · ${state.vaultKb} KB`
+                ? `${notes.length} notes · ${state.vaultKb} KB`
                 : "0 notes · 0 KB"
             }
             tone={state.vaultKb > 0 ? "ok" : "neutral"}
@@ -345,21 +407,20 @@ function StoryPanel({
       </div>
 
       <VaultPanel
-        notes={state.vault}
+        notes={notes}
         vaultKb={state.vaultKb}
         writeEvent={state.writeEvent}
-        tick={tick}
         emptyHint={
           tone === "bad" ? "nothing on disk — all in the window" : "waiting for capture…"
         }
       />
 
-      <div className="mt-4 min-h-[112px] flex-1 rounded-xl border border-line bg-bg/50 p-4 font-mono text-[13px] leading-relaxed">
+      <div className="mt-4 min-h-[108px] flex-1 rounded-xl border border-line bg-bg/50 p-4 font-mono text-[13px] leading-relaxed">
         <div className="mb-2 flex justify-between text-[11px] text-ink-faint">
           <span>session transcript</span>
           <span>
             re-carry{" "}
-            <span className={state.ctxPct > 50 ? "text-accent" : "text-accent"}>
+            <span className="text-accent">
               {state.ctxPct > 50 ? "taxed" : "lean"}
             </span>
           </span>
@@ -367,7 +428,7 @@ function StoryPanel({
         <ul className="space-y-1.5 text-ink-dim">
           {state.lines.map((line, i) => (
             <li
-              key={`${tick}-${i}-${line}`}
+              key={`${i}-${line}`}
               className={
                 line.startsWith("$") || line.startsWith("↳")
                   ? "text-accent"
@@ -398,11 +459,7 @@ function StoryPanel({
               ? "extra tokens re-carried this session"
               : "extra tokens above 50% line"}
           </p>
-          <p
-            className={`mt-0.5 font-mono text-xl tabular-nums sm:text-2xl ${
-              tone === "bad" && state.tokensWasted > 0 ? "text-accent" : "text-accent"
-            }`}
-          >
+          <p className="mt-0.5 font-mono text-xl tabular-nums text-accent sm:text-2xl">
             {state.tokensWasted.toLocaleString()}
           </p>
         </div>
@@ -446,8 +503,12 @@ function Bar({
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
         <div
-          className="h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none"
-          style={{ width: `${Math.min(100, value)}%`, background: fill }}
+          className="h-full rounded-full will-change-[width]"
+          style={{
+            width: `${Math.min(100, Math.max(0, value))}%`,
+            background: fill,
+            transition: "width 80ms linear",
+          }}
         />
       </div>
     </div>
@@ -468,9 +529,7 @@ function Badge({
         ? "border-accent/40 bg-accent/10 text-accent"
         : "border-line text-ink-faint";
   return (
-    <span
-      className={`shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] transition-colors duration-500 ${cls}`}
-    >
+    <span className={`shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] ${cls}`}>
       {label}
     </span>
   );
@@ -480,17 +539,15 @@ function VaultPanel({
   notes,
   vaultKb,
   writeEvent,
-  tick,
   emptyHint,
 }: {
   notes: VaultNote[];
   vaultKb: number;
   writeEvent: string | null;
-  tick: number;
   emptyHint: string;
 }) {
   return (
-    <div className="mt-7 rounded-xl border border-line bg-bg/50">
+    <div className="mt-6 rounded-xl border border-line bg-bg/50">
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5 text-[11px] text-ink-faint">
         <span className="font-mono">~/vault (Obsidian)</span>
         <span className="font-mono tabular-nums">
@@ -507,8 +564,8 @@ function VaultPanel({
           <ul className="space-y-1">
             {notes.map((n) => (
               <li
-                key={`${tick}-${n.path}`}
-                className="flex items-center justify-between gap-2 text-accent animate-[fadeIn_0.45s_ease-out]"
+                key={n.path}
+                className="flex items-center justify-between gap-2 text-accent"
               >
                 <span className="min-w-0 truncate">
                   <span className="text-accent">+</span> {n.path}
@@ -521,10 +578,7 @@ function VaultPanel({
           </ul>
         )}
         {writeEvent && (
-          <p
-            key={`${tick}-write`}
-            className="mt-2 border-t border-line pt-2 text-[11px] text-accent"
-          >
+          <p className="mt-2 border-t border-line pt-2 text-[11px] text-accent">
             {writeEvent}
           </p>
         )}
@@ -536,7 +590,7 @@ function VaultPanel({
           return (
             <div
               key={i}
-              className={`w-full rounded-sm transition-colors duration-500 motion-reduce:transition-none ${
+              className={`w-full rounded-sm transition-colors duration-300 ${
                 filled ? "bg-accent/70" : "bg-surface-2"
               }`}
               style={{ height: h }}
