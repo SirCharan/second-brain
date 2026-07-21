@@ -156,17 +156,20 @@ function buildGraph(seed: number, scale: number) {
 
 const nid = (x: GNode | number) => (typeof x === "object" ? x.id : x);
 
-// Soft cinema timing
-const GROW_MS = 980;
-const REVEAL_MS = 72;
-const REVEAL_BATCH = 2;
-const SEED_FRAC = 0.08;
+/** Default: punchy wire-up. cinematic=true: launch-reel drama (faster cascade, hotter pulses). */
+const TIMING = {
+  default: { GROW_MS: 720, REVEAL_MS: 48, REVEAL_BATCH: 4, SEED_FRAC: 0.05, pulseEvery: 28, maxPulses: 9 },
+  cinematic: { GROW_MS: 520, REVEAL_MS: 32, REVEAL_BATCH: 7, SEED_FRAC: 0.02, pulseEvery: 14, maxPulses: 16 },
+} as const;
 
 export default function GraphField({
   mode = "interactive",
+  cinematic = false,
   className = "",
 }: {
   mode?: Mode;
+  /** Launch-video mode: denser cascade, hotter pulses, stronger birth kicks. */
+  cinematic?: boolean;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -177,12 +180,14 @@ export default function GraphField({
     const parent = canvas.parentElement!;
     const ctx = canvas.getContext("2d")!;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const T = cinematic ? TIMING.cinematic : TIMING.default;
+    const { GROW_MS, REVEAL_MS, REVEAL_BATCH, SEED_FRAC } = T;
 
     let w = parent.clientWidth;
     let h = parent.clientHeight;
     const scale = w < 700 ? 0.42 : w < 1100 ? 0.72 : 1;
-    const { nodes, links } = buildGraph(11, scale);
-    const rnd = mulberry32(23);
+    const { nodes, links } = buildGraph(cinematic ? 17 : 11, scale);
+    const rnd = mulberry32(cinematic ? 41 : 23);
 
     const incident = new Map<number, number[]>();
     for (const l of links) {
@@ -202,25 +207,33 @@ export default function GraphField({
       .distance((l) => ((l.source as GNode).comm === 4 ? 32 : 26))
       .strength(0.1);
 
-    // Softer charge + higher velocity decay = calmer settle (cinema feel)
+    const charge = cinematic
+      ? scale < 0.6
+        ? -28
+        : -42
+      : scale < 0.6
+        ? -18
+        : -26;
     const sim: Simulation<GNode, undefined> = forceSimulation(active)
-      .force("charge", forceManyBody().strength(scale < 0.6 ? -14 : -20).theta(0.9))
+      .force("charge", forceManyBody().strength(charge).theta(0.9))
       .force("link", linkForce)
       .force(
         "x",
-        forceX<GNode>((d) => d.cx * w).strength((d) => d.cs * 0.85),
+        forceX<GNode>((d) => d.cx * w).strength((d) => d.cs * (cinematic ? 0.7 : 0.85)),
       )
       .force(
         "y",
-        forceY<GNode>((d) => d.cy * h).strength((d) => d.cs * 0.85),
+        forceY<GNode>((d) => d.cy * h).strength((d) => d.cs * (cinematic ? 0.7 : 0.85)),
       )
-      .force("collide", forceCollide<GNode>().radius((d) => d.r + 1.8))
-      .alpha(0.75)
-      .alphaDecay(0.016)
-      .velocityDecay(0.48);
+      .force("collide", forceCollide<GNode>().radius((d) => d.r + (cinematic ? 2.2 : 1.8)))
+      .alpha(cinematic ? 1 : 0.82)
+      .alphaDecay(cinematic ? 0.012 : 0.016)
+      .velocityDecay(cinematic ? 0.38 : 0.46);
     sim.stop();
 
     function reveal(count: number, now: number) {
+      const kick = cinematic ? 3.8 : 1.6;
+      const scatter = cinematic ? 22 : 14;
       for (let c = 0; c < count && cursor < nodes.length; c++) {
         const n = nodes[cursor++];
         let placed = false;
@@ -228,19 +241,19 @@ export default function GraphField({
         if (inc) {
           for (const o of inc) {
             if (shown[o]) {
-              // birth near a neighbour — soft kick, not a snap
-              n.x = (nodes[o].x ?? n.cx * w) + (rnd() - 0.5) * 14;
-              n.y = (nodes[o].y ?? n.cy * h) + (rnd() - 0.5) * 14;
-              n.vx = (rnd() - 0.5) * 1.2;
-              n.vy = (rnd() - 0.5) * 1.2;
+              // birth near a neighbour — spring out so links read as growth
+              n.x = (nodes[o].x ?? n.cx * w) + (rnd() - 0.5) * scatter;
+              n.y = (nodes[o].y ?? n.cy * h) + (rnd() - 0.5) * scatter;
+              n.vx = (rnd() - 0.5) * kick;
+              n.vy = (rnd() - 0.5) * kick;
               placed = true;
               break;
             }
           }
         }
         if (!placed) {
-          n.x = n.cx * w + (rnd() - 0.5) * w * 0.08;
-          n.y = n.cy * h + (rnd() - 0.5) * h * 0.08;
+          n.x = n.cx * w + (rnd() - 0.5) * w * (cinematic ? 0.12 : 0.08);
+          n.y = n.cy * h + (rnd() - 0.5) * h * (cinematic ? 0.12 : 0.08);
         }
         n.born = now;
         shown[n.id] = 1;
@@ -255,8 +268,7 @@ export default function GraphField({
       }
       sim.nodes(active);
       linkForce.links(activeLinks);
-      // soft restart — never a hard jolt
-      sim.alpha(Math.max(sim.alpha(), 0.28)).restart();
+      sim.alpha(Math.max(sim.alpha(), cinematic ? 0.55 : 0.32)).restart();
     }
 
     let dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -400,33 +412,49 @@ export default function GraphField({
     const pulses: Pulse[] = [];
     let pulseClock = 0;
     function spawnPulse() {
-      if (pulses.length > 4 || activeLinks.length === 0) return;
-      pulses.push({
-        link: (Math.random() * activeLinks.length) | 0,
-        t: 0,
-        speed: 0.0035 + Math.random() * 0.005,
-      });
+      if (pulses.length > T.maxPulses || activeLinks.length === 0) return;
+      const n = cinematic ? 2 : 1;
+      for (let i = 0; i < n; i++) {
+        pulses.push({
+          link: (Math.random() * activeLinks.length) | 0,
+          t: 0,
+          speed: (cinematic ? 0.008 : 0.004) + Math.random() * 0.008,
+        });
+      }
     }
 
     const growOf = (n: GNode, now: number) => {
       if (reduced || n.born == null) return 1;
       const g = Math.min(1, (now - n.born) / GROW_MS);
-      // smoother ease-out cubic
+      // ease-out cubic + slight overshoot for cinematic pop
+      if (cinematic) {
+        const t = 1 - Math.pow(1 - g, 3);
+        return Math.min(1.12, t * 1.08);
+      }
       return 1 - Math.pow(1 - g, 3);
     };
+
+    // slow dramatic zoom-out while vault fills (cinematic only)
+    let camK = cinematic ? 1.35 : 1;
+    let camTx = cinematic ? -w * 0.06 : 0;
+    let camTy = cinematic ? -h * 0.04 : 0;
+    const t0 = performance.now();
 
     function draw(now: number) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
 
-      if (mode === "ambient") {
-        // very soft parallax
+      const useK = mode === "interactive" ? k * camK : camK;
+      const useTx = mode === "interactive" ? tx + camTx : camTx;
+      const useTy = mode === "interactive" ? ty + camTy : camTy;
+
+      if (mode === "ambient" && !cinematic) {
         ctx.translate((mx - w / 2) * 0.008, (my - h / 2) * 0.008);
       } else {
-        ctx.translate(tx, ty);
-        ctx.scale(k, k);
+        ctx.translate(useTx, useTy);
+        ctx.scale(useK, useK);
       }
-      const sw = mode === "interactive" ? k : 1;
+      const sw = mode === "interactive" || cinematic ? useK : 1;
 
       for (const l of activeLinks) {
         const s = l.source as GNode;
@@ -434,12 +462,13 @@ export default function GraphField({
         const g = Math.min(growOf(s, now), growOf(t, now));
         if (g <= 0.02) continue;
         const lit = hover >= 0 && (s.id === hover || t.id === hover);
+        const baseA = cinematic ? 0.16 : 0.11;
         ctx.strokeStyle = lit
-          ? `rgba(230,165,75,${0.42 * g})`
+          ? `rgba(230,165,75,${(cinematic ? 0.65 : 0.42) * Math.min(1, g)})`
           : hover >= 0
-            ? `rgba(243,238,229,${0.035 * g})`
-            : `rgba(243,238,229,${0.11 * g})`;
-        ctx.lineWidth = (lit ? 1.0 : 0.55) / sw;
+            ? `rgba(243,238,229,${0.035 * Math.min(1, g)})`
+            : `rgba(243,238,229,${baseA * Math.min(1, g)})`;
+        ctx.lineWidth = (lit ? 1.25 : cinematic ? 0.7 : 0.55) / sw;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(s.x!, s.y!);
@@ -454,11 +483,12 @@ export default function GraphField({
         const t = l.target as GNode;
         const x = s.x! + (t.x! - s.x!) * p.t;
         const y = s.y! + (t.y! - s.y!) * p.t;
+        const pr = (cinematic ? 2.4 : 1.6) / sw;
         ctx.beginPath();
-        ctx.arc(x, y, 1.6 / sw, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(230,165,75,0.75)";
-        ctx.shadowColor = "rgba(230,165,75,0.45)";
-        ctx.shadowBlur = 4;
+        ctx.arc(x, y, pr, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(230,165,75,0.9)";
+        ctx.shadowColor = "rgba(230,165,75,0.75)";
+        ctx.shadowBlur = cinematic ? 10 : 4;
         ctx.fill();
         ctx.shadowBlur = 0;
       }
@@ -466,9 +496,18 @@ export default function GraphField({
       for (const n of active) {
         const g = growOf(n, now);
         const dim = hover >= 0 && n.id !== hover && !neighbors.has(n.id);
-        ctx.globalAlpha = (dim ? 0.16 : 1) * g;
+        const alpha = (dim ? 0.16 : 1) * Math.min(1, g);
+        ctx.globalAlpha = alpha;
+        const rr = n.r * (0.3 + 0.7 * Math.min(1, g));
+        // birth halo
+        if (cinematic && g < 1.05 && g > 0.05) {
+          ctx.beginPath();
+          ctx.arc(n.x!, n.y!, rr * 2.2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(230,165,75,${0.12 * (1 - Math.min(1, g))})`;
+          ctx.fill();
+        }
         ctx.beginPath();
-        ctx.arc(n.x!, n.y!, n.r * (0.35 + 0.65 * g), 0, Math.PI * 2);
+        ctx.arc(n.x!, n.y!, rr, 0, Math.PI * 2);
         ctx.fillStyle = n.id === hover ? "#f3eee5" : n.color;
         ctx.fill();
         ctx.globalAlpha = 1;
@@ -481,23 +520,44 @@ export default function GraphField({
 
     function frame(now: number) {
       if (!reduced) {
-        // cinema-style slow wire-up
-        if (cursor < nodes.length && now - lastReveal > REVEAL_MS) {
-          reveal(REVEAL_BATCH, now);
+        // staged cascade: slow start, then flood, then settle
+        let batch: number = REVEAL_BATCH;
+        let interval: number = REVEAL_MS;
+        if (cinematic) {
+          const p = cursor / Math.max(1, nodes.length);
+          if (p < 0.15) {
+            batch = 3;
+            interval = 55;
+          } else if (p < 0.7) {
+            batch = 9;
+            interval = 22;
+          } else {
+            batch = 4;
+            interval = 40;
+          }
+          // slow pull-back so the full vault enters frame
+          const age = Math.min(1, (now - t0) / 9000);
+          camK = 1.35 - age * 0.38;
+          camTx = -w * 0.06 * (1 - age * 0.5);
+          camTy = -h * 0.04 * (1 - age * 0.5);
+        }
+        if (cursor < nodes.length && now - lastReveal > interval) {
+          reveal(batch, now);
           lastReveal = now;
         }
-        // quiet breath when nearly settled (cinema micro-jiggle)
-        if (cursor >= nodes.length && sim.alpha() < 0.022 && !dragging) {
-          for (let i = 0; i < 3; i++) {
+        // alive breath after settle
+        if (cursor >= nodes.length && sim.alpha() < 0.028 && !dragging) {
+          const nJ = cinematic ? 8 : 3;
+          for (let i = 0; i < nJ; i++) {
             const n = active[(Math.random() * active.length) | 0];
             if (!n || n.fx != null) continue;
-            n.vx = (n.vx ?? 0) + (Math.random() - 0.5) * 0.22;
-            n.vy = (n.vy ?? 0) + (Math.random() - 0.5) * 0.22;
+            n.vx = (n.vx ?? 0) + (Math.random() - 0.5) * (cinematic ? 0.55 : 0.22);
+            n.vy = (n.vy ?? 0) + (Math.random() - 0.5) * (cinematic ? 0.55 : 0.22);
           }
-          sim.alpha(0.04).restart();
+          sim.alpha(cinematic ? 0.07 : 0.04).restart();
         }
         pulseClock++;
-        if (pulseClock % 48 === 0) spawnPulse();
+        if (pulseClock % T.pulseEvery === 0) spawnPulse();
         for (let i = pulses.length - 1; i >= 0; i--) {
           pulses[i].t += pulses[i].speed;
           if (pulses[i].t >= 1) pulses.splice(i, 1);
@@ -513,11 +573,11 @@ export default function GraphField({
       sim.stop();
       draw(0);
     } else {
-      // tiny seed, then soft growth (cinema "expand from seed")
-      const seed = Math.max(6, Math.floor(nodes.length * SEED_FRAC));
+      // tiny seed, then cascade
+      const seed = Math.max(cinematic ? 3 : 6, Math.floor(nodes.length * SEED_FRAC));
       const t = performance.now();
       reveal(seed, t - GROW_MS);
-      for (let i = 0; i < 40; i++) sim.tick();
+      for (let i = 0; i < (cinematic ? 20 : 40); i++) sim.tick();
       lastReveal = t;
       raf = requestAnimationFrame(frame);
     }
@@ -564,7 +624,7 @@ export default function GraphField({
       canvas.removeEventListener("wheel", onWheel);
       parent.removeEventListener("pointermove", onMove);
     };
-  }, [mode]);
+  }, [mode, cinematic]);
 
   return (
     <canvas

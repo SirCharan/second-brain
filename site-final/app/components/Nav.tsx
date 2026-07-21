@@ -1,8 +1,18 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Mark, GitHubMark } from "./Mark";
 
 const REPO = "https://github.com/SirCharan/second-brain";
 
 export default function Nav() {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setHidden(q.has("reel"));
+  }, []);
+  if (hidden) return null;
+
   return (
     <nav className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">
       <div className="flex w-full max-w-6xl items-center justify-between rounded-2xl border border-line bg-surface/55 py-2.5 pl-4 pr-2.5 backdrop-blur-md">
