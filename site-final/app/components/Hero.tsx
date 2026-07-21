@@ -30,39 +30,40 @@ export default function Hero() {
       </p>
 
       <div className="pointer-events-none relative z-10 mx-auto w-full max-w-6xl">
-        {/* tight left column — graph breathes on the right 55%+ */}
-        <div className="max-w-[22rem] sm:max-w-md lg:max-w-[26rem]">
+        {/* left-pocketed: headline stays one phrase per line; body stays narrow so graph shows */}
+        <div className="max-w-[min(100%,34rem)]">
           <p className="font-mono text-[11px] tracking-[0.18em] text-accent uppercase">
             local-first · open source · your disk
           </p>
 
-          <h1 className="mt-5 font-display text-[clamp(2.6rem,6.2vw,4.6rem)] leading-[0.98] tracking-tight">
-            The chat ends.
-            <br />
-            <span className="text-accent">The memory stays.</span>
+          <h1 className="mt-5 font-display text-[clamp(2.15rem,6.5vw,3.75rem)] leading-[1.05] tracking-tight">
+            <span className="block whitespace-nowrap">The chat ends.</span>
+            <span className="block whitespace-nowrap text-accent">The memory stays.</span>
           </h1>
 
-          <p className="mt-6 text-base leading-relaxed text-ink-dim sm:text-lg">
-            second-brain captures every AI session into Markdown on your machine.
-            Switch models, clear the window, close the laptop. Nothing walks away.
-          </p>
+          <div className="max-w-md">
+            <p className="mt-6 text-base leading-relaxed text-ink-dim sm:text-lg">
+              second-brain captures every AI session into Markdown on your machine.
+              Switch models, clear the window, close the laptop. Nothing walks away.
+            </p>
 
-          <div className="pointer-events-auto mt-9">
-            <CopyCommand command={INSTALL} />
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-faint">
-              <span>
-                or <code className="font-mono text-ink-dim">./install.sh</code>
-              </span>
-              <a
-                href={REPO}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 text-ink-dim transition-colors hover:text-ink"
-              >
-                <GitHubMark size={15} />
-                Star on GitHub
-              </a>
-              <span>Apache-2.0</span>
+            <div className="pointer-events-auto mt-9">
+              <CopyCommand command={INSTALL} />
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-faint">
+                <span>
+                  or <code className="font-mono text-ink-dim">./install.sh</code>
+                </span>
+                <a
+                  href={REPO}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 text-ink-dim transition-colors hover:text-ink"
+                >
+                  <GitHubMark size={15} />
+                  Star on GitHub
+                </a>
+                <span>Apache-2.0</span>
+              </div>
             </div>
           </div>
         </div>
