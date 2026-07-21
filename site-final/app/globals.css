@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* Base tokens — final palette refined as screenshots land */
+@theme {
+  --color-bg: #0c0a09;
+  --color-surface: #15120e;
+  --color-surface-2: #1e1913;
+  --color-ink: #f3eee5;
+  --color-ink-dim: #a99f91;
+  --color-ink-faint: #8a8074;
+  --color-accent: #e6a54b;
+  --color-accent-dim: #977a45;
+  --color-line: color-mix(in oklab, #f3eee5 9%, transparent);
+  --color-line-strong: color-mix(in oklab, #f3eee5 16%, transparent);
+
+  --font-display: var(--font-gambarino), Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+main {
+  position: relative;
+  z-index: 1;
+}
+
+/* warm directional wash — behind content */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 80% at 15% -10%,
+    color-mix(in oklab, var(--color-accent) 6%, transparent),
+    transparent 55%
+  );
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 30%, transparent);
+  color: var(--color-ink);
+}
+
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-accent) 70%, transparent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
