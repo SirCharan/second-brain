@@ -8,18 +8,18 @@ export default function Hero({ mode }: { mode: "ambient" | "interactive" }) {
   return (
     <section
       id="top"
-      className="relative flex min-h-svh flex-col justify-center overflow-hidden px-6 pb-20 pt-28 sm:px-10"
+      className="relative flex min-h-svh flex-col justify-end overflow-hidden px-6 pb-16 pt-24 sm:px-10"
     >
-      {/* the signature: a living vault-graph, full-bleed behind everything */}
+      {/* the signature: a living vault-graph, full-screen, the star of the fold */}
       <GraphField mode={mode} className="absolute inset-0 h-full w-full" />
 
-      {/* legibility scrim — darker toward the copy, and the graph dissolves into
-          the page color at the bottom so the next section starts clean */}
+      {/* scrim weighted to the bottom, where the copy sits — the graph stays clear
+          up top and dissolves into the page color at the very bottom */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(90% 70% at 30% 42%, rgba(12,10,9,0.82), rgba(12,10,9,0.35) 55%, transparent 80%), linear-gradient(to bottom, transparent 55%, var(--color-bg) 97%)",
+            "linear-gradient(to top, var(--color-bg) 5%, rgba(12,10,9,0.72) 26%, rgba(12,10,9,0.22) 50%, transparent 72%)",
         }}
       />
 
@@ -55,6 +55,13 @@ export default function Hero({ mode }: { mode: "ambient" | "interactive" }) {
           </div>
         </div>
       </div>
+
+      {/* interaction hint, only where it applies */}
+      {mode === "interactive" && (
+        <div className="pointer-events-none absolute right-6 top-24 z-10 hidden font-mono text-xs text-ink-faint sm:block">
+          scroll to zoom · drag to pan · hover a node
+        </div>
+      )}
     </section>
   );
 }

@@ -15,9 +15,13 @@ type Mode = "ambient" | "interactive";
 
 type GNode = {
   id: number;
+  comm: number;
   deg: number;
   color: string;
   r: number;
+  cx: number; // community anchor (fraction of canvas)
+  cy: number;
+  cs: number; // anchor strength
   x?: number;
   y?: number;
   vx?: number;
@@ -28,10 +32,17 @@ type GNode = {
 type GLink = { source: GNode | number; target: GNode | number };
 type Pulse = { link: number; t: number; speed: number };
 
-/* warm Obsidian palette — amber heaviest, then honey-yellow, then cream */
-const PALETTE = ["#e6a54b", "#e6a54b", "#d98a3d", "#e8c56a", "#e8c56a", "#f0e7d6"];
+/* Communities coloured like the real Obsidian graph: a big coral cluster, a tan
+   cluster, a yellow arm, a brown-hub cluster, the radial fan, and grey orphans. */
+const COMMUNITIES = [
+  { key: "coral", palette: ["#e2532f", "#e0603a", "#d9542c", "#e86a42"], cx: 0.72, cy: 0.66 },
+  { key: "tan", palette: ["#c9a35f", "#b8935a", "#caa869", "#bd9a54"], cx: 0.46, cy: 0.5 },
+  { key: "yellow", palette: ["#e8c94a", "#ecd24f", "#f0d84a", "#e3c24d"], cx: 0.22, cy: 0.42 },
+  { key: "brown", palette: ["#8a6f4a", "#9c7d50", "#7d6543"], cx: 0.4, cy: 0.72 },
+  { key: "fan", palette: ["#c9a35f", "#caa869", "#d8b878"], cx: 0.78, cy: 0.24 },
+  { key: "grey", palette: ["#b9b3ab", "#a7a199"], cx: 0.5, cy: 0.5 },
+];
 
-/* deterministic RNG so the graph looks intentional and identical each load */
 function mulberry32(seed: number) {
   return () => {
     seed |= 0;
@@ -42,29 +53,99 @@ function mulberry32(seed: number) {
   };
 }
 
-function buildGraph(seed: number, count: number) {
+function buildGraph(seed: number, scale: number) {
   const rnd = mulberry32(seed);
   const nodes: GNode[] = [];
-  for (let i = 0; i < count; i++)
-    nodes.push({ id: i, deg: 0, color: PALETTE[(rnd() * PALETTE.length) | 0], r: 3 });
-
-  // a handful of hubs, the rest attach to a nearby hub + a few extra links
-  const hubs = [0, 1, 2, 3];
   const links: GLink[] = [];
-  const add = (a: number, b: number) => {
+  let id = 0;
+
+  const pick = (arr: string[]) => arr[(rnd() * arr.length) | 0];
+  const addNode = (comm: number, cs = 0.05) => {
+    const c = COMMUNITIES[comm];
+    const n: GNode = {
+      id: id++,
+      comm,
+      deg: 0,
+      color: pick(c.palette),
+      r: 3,
+      cx: c.cx,
+      cy: c.cy,
+      cs,
+    };
+    nodes.push(n);
+    return n;
+  };
+  const addLink = (a: number, b: number) => {
     if (a === b) return;
     links.push({ source: a, target: b });
     nodes[a].deg++;
     nodes[b].deg++;
   };
-  for (let i = 0; i < count; i++) {
-    if (hubs.includes(i)) continue;
-    add(i, hubs[(rnd() * hubs.length) | 0]); // spoke to a hub
-    if (rnd() < 0.55) add(i, ((rnd() * count) | 0)); // an extra cross-link
-  }
-  for (let h = 0; h < hubs.length; h++) add(hubs[h], hubs[(h + 1) % hubs.length]); // hub ring
 
-  for (const n of nodes) n.r = 2.4 + Math.min(n.deg, 18) * 0.42; // size by degree
+  // sizes scale down a bit on small screens
+  const S = scale;
+  // coral (0), tan (1), yellow (2), brown (3) — clustered communities with a hub each
+  const sized = [
+    { comm: 0, n: Math.round(92 * S) },
+    { comm: 1, n: Math.round(64 * S) },
+    { comm: 2, n: Math.round(34 * S) },
+    { comm: 3, n: Math.round(40 * S) },
+  ];
+  const hubIds: number[] = [];
+  // coral (our real "drishti") is the dominant cluster with several mega-hubs
+  const HUBS_PER: Record<number, number> = { 0: 3, 1: 2, 2: 1, 3: 2 };
+  for (const grp of sized) {
+    const start = id;
+    const gHubs: number[] = [];
+    const nh = HUBS_PER[grp.comm] ?? 1;
+    for (let hI = 0; hI < nh; hI++) {
+      const hub = addNode(grp.comm, 0.09);
+      gHubs.push(hub.id);
+      hubIds.push(hub.id);
+    }
+    for (let i = gHubs.length; i < grp.n; i++) {
+      const nd = addNode(grp.comm);
+      addLink(nd.id, gHubs[(rnd() * gHubs.length) | 0]); // attach to a group hub
+      if (nh > 1 && rnd() < 0.35) addLink(nd.id, gHubs[(rnd() * gHubs.length) | 0]);
+      // dense intra-community mesh — echoes the real vault (~12 edges/node)
+      const extra = 2 + ((rnd() * 4) | 0);
+      for (let k = 0; k < extra; k++) {
+        const other = start + ((rnd() * (id - start)) | 0);
+        if (rnd() < 0.6) addLink(nd.id, other);
+      }
+    }
+  }
+
+  // radial fan (community 4): one big hub, many leaves on pure spokes
+  const fanHub = addNode(4, 0.12);
+  const fanLeaves = Math.round(74 * S);
+  for (let i = 0; i < fanLeaves; i++) {
+    const leaf = addNode(4, 0.02);
+    addLink(leaf.id, fanHub.id);
+  }
+
+  // grey orphans: a few pairs (one link) + singletons, scattered to the edges
+  const orphanSpots = [
+    [0.12, 0.12], [0.9, 0.42], [0.06, 0.7], [0.5, 0.08], [0.94, 0.72], [0.16, 0.9],
+  ];
+  for (let i = 0; i < orphanSpots.length; i++) {
+    const a = addNode(5, 0.16);
+    a.cx = orphanSpots[i][0];
+    a.cy = orphanSpots[i][1];
+    if (rnd() < 0.6) {
+      const b = addNode(5, 0.16);
+      b.cx = a.cx + (rnd() - 0.5) * 0.05;
+      b.cy = a.cy + (rnd() - 0.5) * 0.08;
+      addLink(a.id, b.id);
+    }
+  }
+
+  // a handful of bridges between community hubs
+  for (let i = 0; i < hubIds.length; i++)
+    if (rnd() < 0.8) addLink(hubIds[i], hubIds[(i + 1) % hubIds.length]);
+  addLink(hubIds[1], fanHub.id); // tan hub links to the fan
+
+  for (const n of nodes) n.r = 2.3 + Math.min(n.deg, 40) * 0.32; // size by degree
   return { nodes, links };
 }
 
@@ -86,34 +167,38 @@ export default function GraphField({
 
     let w = parent.clientWidth;
     let h = parent.clientHeight;
-    const count = w < 640 ? 42 : 66;
-    const { nodes, links } = buildGraph(7, count);
+    const scale = w < 700 ? 0.42 : w < 1100 ? 0.72 : 1;
+    const { nodes, links } = buildGraph(11, scale);
 
-    // seed positions around center so the settle reads as "pathways forming"
-    const rnd = mulberry32(19);
+    // seed each node near its community anchor so clusters separate on settle
+    const rnd = mulberry32(23);
     for (const n of nodes) {
-      n.x = w / 2 + (rnd() - 0.5) * w * 0.7;
-      n.y = h / 2 + (rnd() - 0.5) * h * 0.7;
+      n.x = n.cx * w + (rnd() - 0.5) * w * 0.18;
+      n.y = n.cy * h + (rnd() - 0.5) * h * 0.18;
     }
 
     const sim: Simulation<GNode, undefined> = forceSimulation(nodes)
-      .force("charge", forceManyBody().strength(w < 640 ? -34 : -52))
+      .force("charge", forceManyBody().strength(scale < 0.6 ? -18 : -26).theta(0.9))
       .force(
         "link",
         forceLink<GNode, GLink>(links)
           .id((d) => d.id)
-          .distance(46)
-          .strength(0.28),
+          .distance((l) => ((l.source as GNode).comm === 4 ? 30 : 24))
+          .strength(0.12),
       )
-      .force("x", forceX(() => w / 2).strength(0.028))
-      .force("y", forceY(() => h / 2).strength(0.05))
-      .force("collide", forceCollide<GNode>().radius((d) => d.r + 3))
+      .force("x", forceX<GNode>((d) => d.cx * w).strength((d) => d.cs))
+      .force("y", forceY<GNode>((d) => d.cy * h).strength((d) => d.cs))
+      .force("collide", forceCollide<GNode>().radius((d) => d.r + 1.5))
       .alpha(1)
-      .alphaDecay(0.018)
-      .velocityDecay(0.32);
+      .alphaDecay(0.02)
+      .velocityDecay(0.42);
 
-    if (!reduced) sim.alphaTarget(0.008).restart(); // gentle perpetual drift
+    if (!reduced) sim.alphaTarget(0.006).restart();
 
+    // view transform (zoom/pan) — interactive only
+    let k = 1,
+      tx = 0,
+      ty = 0;
     let dpr = Math.min(window.devicePixelRatio || 1, 2);
     function resize() {
       w = parent.clientWidth;
@@ -123,71 +208,87 @@ export default function GraphField({
       canvas.height = h * dpr;
       canvas.style.width = w + "px";
       canvas.style.height = h + "px";
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(parent);
 
-    // pointer state
     let mx = w / 2,
-      my = h / 2; // for ambient parallax
+      my = h / 2;
     let hover = -1;
     let dragging: GNode | null = null;
+    let panning = false;
+    let panLast = { x: 0, y: 0 };
     const neighbors = new Set<number>();
 
-    function nodeAt(px: number, py: number) {
-      for (const n of nodes) {
-        const dx = (n.x ?? 0) - px;
-        const dy = (n.y ?? 0) - py;
-        if (dx * dx + dy * dy < (n.r + 6) * (n.r + 6)) return n;
+    const toGraph = (cx: number, cy: number) => ({ x: (cx - tx) / k, y: (cy - ty) / k });
+    function nodeAt(gx: number, gy: number) {
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        const dx = (n.x ?? 0) - gx;
+        const dy = (n.y ?? 0) - gy;
+        const rr = n.r + 4 / k;
+        if (dx * dx + dy * dy < rr * rr) return n;
       }
       return null;
     }
-    function computeNeighbors(id: number) {
+    function computeNeighbors(nid: number) {
       neighbors.clear();
       for (const l of links) {
         const s = (l.source as GNode).id;
         const t = (l.target as GNode).id;
-        if (s === id) neighbors.add(t);
-        if (t === id) neighbors.add(s);
+        if (s === nid) neighbors.add(t);
+        if (t === nid) neighbors.add(s);
       }
     }
-
-    function toLocal(e: PointerEvent) {
+    const local = (e: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    }
+    };
+
     const onMove = (e: PointerEvent) => {
-      const p = toLocal(e);
+      const p = local(e);
       mx = p.x;
       my = p.y;
       if (mode !== "interactive") return;
       if (dragging) {
-        dragging.fx = p.x;
-        dragging.fy = p.y;
-        sim.alphaTarget(0.2).restart();
+        const g = toGraph(p.x, p.y);
+        dragging.fx = g.x;
+        dragging.fy = g.y;
+        sim.alphaTarget(0.15).restart();
         return;
       }
-      const n = nodeAt(p.x, p.y);
-      const id = n ? n.id : -1;
-      if (id !== hover) {
-        hover = id;
-        if (id >= 0) computeNeighbors(id);
+      if (panning) {
+        tx += p.x - panLast.x;
+        ty += p.y - panLast.y;
+        panLast = p;
+        return;
+      }
+      const g = toGraph(p.x, p.y);
+      const n = nodeAt(g.x, g.y);
+      const nid = n ? n.id : -1;
+      if (nid !== hover) {
+        hover = nid;
+        if (nid >= 0) computeNeighbors(nid);
         else neighbors.clear();
       }
-      canvas.style.cursor = n ? "grab" : "default";
+      canvas.style.cursor = n ? "grab" : "grab";
     };
     const onDown = (e: PointerEvent) => {
       if (mode !== "interactive") return;
-      const p = toLocal(e);
-      const n = nodeAt(p.x, p.y);
+      const p = local(e);
+      const g = toGraph(p.x, p.y);
+      const n = nodeAt(g.x, g.y);
       if (n) {
         dragging = n;
-        n.fx = p.x;
-        n.fy = p.y;
+        n.fx = g.x;
+        n.fy = g.y;
         canvas.style.cursor = "grabbing";
-        sim.alphaTarget(0.25).restart();
+        sim.alphaTarget(0.2).restart();
+      } else {
+        panning = true;
+        panLast = p;
+        canvas.style.cursor = "grabbing";
       }
     };
     const onUp = () => {
@@ -195,46 +296,62 @@ export default function GraphField({
         dragging.fx = null;
         dragging.fy = null;
         dragging = null;
-        sim.alphaTarget(0.008); // spring back into the layout
-        canvas.style.cursor = "grab";
+        sim.alphaTarget(0.006);
       }
+      panning = false;
+      canvas.style.cursor = "grab";
     };
+    const onWheel = (e: WheelEvent) => {
+      if (mode !== "interactive") return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const factor = Math.exp(-e.deltaY * 0.0016);
+      const nk = Math.max(0.35, Math.min(4, k * factor));
+      tx = px - (px - tx) * (nk / k);
+      ty = py - (py - ty) * (nk / k);
+      k = nk;
+    };
+
     if (mode === "interactive") {
       canvas.addEventListener("pointermove", onMove);
       canvas.addEventListener("pointerdown", onDown);
       window.addEventListener("pointerup", onUp);
+      canvas.addEventListener("wheel", onWheel, { passive: false });
     } else {
       parent.addEventListener("pointermove", onMove);
     }
 
-    // amber signal pulses traveling edges (the neural firing)
     const pulses: Pulse[] = [];
     let pulseClock = 0;
     function spawnPulse() {
-      if (pulses.length > 5) return;
+      if (pulses.length > 7) return;
       pulses.push({ link: (Math.random() * links.length) | 0, t: 0, speed: 0.006 + Math.random() * 0.01 });
     }
 
     function draw() {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      // ambient parallax: nudge the whole field a few px toward the pointer
-      const ox = mode === "ambient" ? (mx - w / 2) * 0.012 : 0;
-      const oy = mode === "ambient" ? (my - h / 2) * 0.012 : 0;
-      ctx.save();
-      ctx.translate(ox, oy);
+      // ambient parallax vs interactive zoom/pan
+      if (mode === "ambient") {
+        ctx.translate((mx - w / 2) * 0.01, (my - h / 2) * 0.01);
+      } else {
+        ctx.translate(tx, ty);
+        ctx.scale(k, k);
+      }
 
       // links
       for (const l of links) {
         const s = l.source as GNode;
         const t = l.target as GNode;
-        const lit =
-          hover >= 0 && (s.id === hover || t.id === hover);
+        const lit = hover >= 0 && (s.id === hover || t.id === hover);
         ctx.strokeStyle = lit
-          ? "rgba(230,165,75,0.5)"
+          ? "rgba(230,165,75,0.55)"
           : hover >= 0
-            ? "rgba(243,238,229,0.05)"
-            : "rgba(243,238,229,0.11)";
-        ctx.lineWidth = lit ? 1.1 : 0.7;
+            ? "rgba(243,238,229,0.04)"
+            : "rgba(243,238,229,0.09)";
+        ctx.lineWidth = (lit ? 1.1 : 0.6) / (mode === "interactive" ? k : 1);
         ctx.beginPath();
         ctx.moveTo(s.x!, s.y!);
         ctx.lineTo(t.x!, t.y!);
@@ -249,10 +366,10 @@ export default function GraphField({
         const x = s.x! + (t.x! - s.x!) * p.t;
         const y = s.y! + (t.y! - s.y!) * p.t;
         ctx.beginPath();
-        ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+        ctx.arc(x, y, 2 / (mode === "interactive" ? k : 1), 0, Math.PI * 2);
         ctx.fillStyle = "rgba(230,165,75,0.95)";
         ctx.shadowColor = "rgba(230,165,75,0.9)";
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 7;
         ctx.fill();
         ctx.shadowBlur = 0;
       }
@@ -260,14 +377,13 @@ export default function GraphField({
       // nodes
       for (const n of nodes) {
         const dim = hover >= 0 && n.id !== hover && !neighbors.has(n.id);
-        ctx.globalAlpha = dim ? 0.22 : 1;
+        ctx.globalAlpha = dim ? 0.18 : 1;
         ctx.beginPath();
         ctx.arc(n.x!, n.y!, n.r, 0, Math.PI * 2);
         ctx.fillStyle = n.id === hover ? "#f3eee5" : n.color;
         ctx.fill();
         ctx.globalAlpha = 1;
       }
-      ctx.restore();
     }
 
     let raf = 0;
@@ -275,7 +391,7 @@ export default function GraphField({
     function frame() {
       if (!reduced) {
         pulseClock++;
-        if (pulseClock % 42 === 0) spawnPulse();
+        if (pulseClock % 30 === 0) spawnPulse();
         for (let i = pulses.length - 1; i >= 0; i--) {
           pulses[i].t += pulses[i].speed;
           if (pulses[i].t >= 1) pulses.splice(i, 1);
@@ -286,13 +402,12 @@ export default function GraphField({
     }
 
     if (reduced) {
-      for (let i = 0; i < 320; i++) sim.tick(); // settle synchronously
+      for (let i = 0; i < 400; i++) sim.tick();
       draw();
     } else {
       raf = requestAnimationFrame(frame);
     }
 
-    // pause when tab hidden or field scrolled off-screen (perf)
     const onVis = () => {
       if (document.hidden) {
         running = false;
@@ -300,7 +415,7 @@ export default function GraphField({
         sim.stop();
       } else if (!reduced) {
         running = true;
-        sim.alphaTarget(0.008).restart();
+        sim.alphaTarget(0.006).restart();
         raf = requestAnimationFrame(frame);
       }
     };
@@ -308,13 +423,11 @@ export default function GraphField({
     const io = new IntersectionObserver(
       ([e]) => {
         if (reduced) return;
-        if (e.isIntersecting) {
-          if (!running) {
-            running = true;
-            sim.alphaTarget(0.008).restart();
-            raf = requestAnimationFrame(frame);
-          }
-        } else {
+        if (e.isIntersecting && !running) {
+          running = true;
+          sim.alphaTarget(0.006).restart();
+          raf = requestAnimationFrame(frame);
+        } else if (!e.isIntersecting) {
           running = false;
           cancelAnimationFrame(raf);
           sim.stop();
@@ -334,6 +447,7 @@ export default function GraphField({
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointerup", onUp);
+      canvas.removeEventListener("wheel", onWheel);
       parent.removeEventListener("pointermove", onMove);
     };
   }, [mode]);
@@ -343,7 +457,7 @@ export default function GraphField({
       ref={canvasRef}
       aria-hidden="true"
       className={className}
-      style={{ pointerEvents: mode === "interactive" ? "auto" : "none" }}
+      style={{ pointerEvents: mode === "interactive" ? "auto" : "none", touchAction: mode === "interactive" ? "none" : undefined }}
     />
   );
 }
