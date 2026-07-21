@@ -3,19 +3,24 @@ import PromiseStrip from "./components/PromiseStrip";
 import ContextTax from "./components/ContextTax";
 import TokenTax from "./components/TokenTax";
 import Values from "./components/Values";
+import Compare from "./components/Compare";
+import Footer from "./components/Footer";
 
 /**
  * Final landing — assembled from locked screenshot cuts.
- * More sections as screenshots arrive.
  */
 export default function Home() {
   return (
-    <main>
-      <Hero />
-      <PromiseStrip />
-      <ContextTax />
-      <TokenTax />
-      <Values />
-    </main>
+    <>
+      <main>
+        <Hero />
+        <PromiseStrip />
+        <ContextTax />
+        <TokenTax />
+        <Values />
+        <Compare />
+      </main>
+      <Footer />
+    </>
   );
 }
