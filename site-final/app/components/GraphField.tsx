@@ -11,6 +11,12 @@ import {
   type Simulation,
 } from "d3-force";
 
+/**
+ * Hybrid graph for the final landing:
+ * - Physics + hover + drag + pan + ⌘/ctrl-zoom from /live
+ * - Soft progressive birth + quiet breath from cinema (second-brain-cinema)
+ */
+
 type Mode = "ambient" | "interactive";
 
 type GNode = {
@@ -33,7 +39,6 @@ type GNode = {
 type GLink = { source: GNode | number; target: GNode | number; _on?: boolean };
 type Pulse = { link: number; t: number; speed: number };
 
-// anchors pulled toward centre so the clusters read as ONE vault, not islands
 const COMMUNITIES = [
   { key: "coral", palette: ["#e2532f", "#e0603a", "#d9542c", "#e86a42"], cx: 0.64, cy: 0.62 },
   { key: "tan", palette: ["#c9a35f", "#b8935a", "#caa869", "#bd9a54"], cx: 0.48, cy: 0.52 },
@@ -62,7 +67,16 @@ function buildGraph(seed: number, scale: number) {
   const pick = (arr: string[]) => arr[(rnd() * arr.length) | 0];
   const addNode = (comm: number, cs = 0.05) => {
     const c = COMMUNITIES[comm];
-    const n: GNode = { id: id++, comm, deg: 0, color: pick(c.palette), r: 3, cx: c.cx, cy: c.cy, cs };
+    const n: GNode = {
+      id: id++,
+      comm,
+      deg: 0,
+      color: pick(c.palette),
+      r: 3,
+      cx: c.cx,
+      cy: c.cy,
+      cs,
+    };
     nodes.push(n);
     return n;
   };
@@ -108,7 +122,12 @@ function buildGraph(seed: number, scale: number) {
   for (let i = 0; i < fanLeaves; i++) addLink(addNode(4, 0.02).id, fanHub.id);
 
   const orphanSpots = [
-    [0.12, 0.12], [0.9, 0.42], [0.06, 0.7], [0.5, 0.08], [0.94, 0.72], [0.16, 0.9],
+    [0.12, 0.12],
+    [0.9, 0.42],
+    [0.06, 0.7],
+    [0.5, 0.08],
+    [0.94, 0.72],
+    [0.16, 0.9],
   ];
   for (let i = 0; i < orphanSpots.length; i++) {
     const a = addNode(5, 0.16);
@@ -124,11 +143,11 @@ function buildGraph(seed: number, scale: number) {
 
   for (let i = 0; i < hubIds.length; i++) addLink(hubIds[i], hubIds[(i + 1) % hubIds.length]);
   addLink(hubIds[1], fanHub.id);
-  // extra cross-community links so the middle fills and it reads as one graph
   for (let i = 0; i < 22; i++) {
     const a = (rnd() * nodes.length) | 0;
     const b = (rnd() * nodes.length) | 0;
-    if (nodes[a].comm !== nodes[b].comm && nodes[a].comm !== 5 && nodes[b].comm !== 5) addLink(a, b);
+    if (nodes[a].comm !== nodes[b].comm && nodes[a].comm !== 5 && nodes[b].comm !== 5)
+      addLink(a, b);
   }
 
   for (const n of nodes) n.r = 2.3 + Math.min(n.deg, 40) * 0.32;
@@ -137,8 +156,14 @@ function buildGraph(seed: number, scale: number) {
 
 const nid = (x: GNode | number) => (typeof x === "object" ? x.id : x);
 
+// Soft cinema timing
+const GROW_MS = 980;
+const REVEAL_MS = 72;
+const REVEAL_BATCH = 2;
+const SEED_FRAC = 0.08;
+
 export default function GraphField({
-  mode = "ambient",
+  mode = "interactive",
   className = "",
 }: {
   mode?: Mode;
@@ -159,7 +184,6 @@ export default function GraphField({
     const { nodes, links } = buildGraph(11, scale);
     const rnd = mulberry32(23);
 
-    // adjacency (numeric) for placing a new node next to an already-shown neighbour
     const incident = new Map<number, number[]>();
     for (const l of links) {
       const a = l.source as number;
@@ -168,48 +192,55 @@ export default function GraphField({
       (incident.get(b) ?? incident.set(b, []).get(b)!).push(a);
     }
 
-    // progressive reveal: the vault wires itself up in real time
     const active: GNode[] = [];
     const activeLinks: GLink[] = [];
     const shown = new Uint8Array(nodes.length);
     let cursor = 0;
-    const GROW_MS = 460;
 
     const linkForce = forceLink<GNode, GLink>(activeLinks)
       .id((d) => d.id)
-      .distance((l) => ((l.source as GNode).comm === 4 ? 30 : 24))
-      .strength(0.12);
+      .distance((l) => ((l.source as GNode).comm === 4 ? 32 : 26))
+      .strength(0.1);
 
+    // Softer charge + higher velocity decay = calmer settle (cinema feel)
     const sim: Simulation<GNode, undefined> = forceSimulation(active)
-      .force("charge", forceManyBody().strength(scale < 0.6 ? -18 : -26).theta(0.9))
+      .force("charge", forceManyBody().strength(scale < 0.6 ? -14 : -20).theta(0.9))
       .force("link", linkForce)
-      .force("x", forceX<GNode>((d) => d.cx * w).strength((d) => d.cs))
-      .force("y", forceY<GNode>((d) => d.cy * h).strength((d) => d.cs))
-      .force("collide", forceCollide<GNode>().radius((d) => d.r + 1.5))
-      .alpha(0.9)
-      .alphaDecay(0.02)
-      .velocityDecay(0.42);
+      .force(
+        "x",
+        forceX<GNode>((d) => d.cx * w).strength((d) => d.cs * 0.85),
+      )
+      .force(
+        "y",
+        forceY<GNode>((d) => d.cy * h).strength((d) => d.cs * 0.85),
+      )
+      .force("collide", forceCollide<GNode>().radius((d) => d.r + 1.8))
+      .alpha(0.75)
+      .alphaDecay(0.016)
+      .velocityDecay(0.48);
     sim.stop();
 
     function reveal(count: number, now: number) {
       for (let c = 0; c < count && cursor < nodes.length; c++) {
         const n = nodes[cursor++];
-        // place beside a revealed neighbour so the link visibly grows out of it
         let placed = false;
         const inc = incident.get(n.id);
         if (inc) {
           for (const o of inc) {
             if (shown[o]) {
-              n.x = (nodes[o].x ?? n.cx * w) + (rnd() - 0.5) * 22;
-              n.y = (nodes[o].y ?? n.cy * h) + (rnd() - 0.5) * 22;
+              // birth near a neighbour — soft kick, not a snap
+              n.x = (nodes[o].x ?? n.cx * w) + (rnd() - 0.5) * 14;
+              n.y = (nodes[o].y ?? n.cy * h) + (rnd() - 0.5) * 14;
+              n.vx = (rnd() - 0.5) * 1.2;
+              n.vy = (rnd() - 0.5) * 1.2;
               placed = true;
               break;
             }
           }
         }
         if (!placed) {
-          n.x = n.cx * w + (rnd() - 0.5) * w * 0.14;
-          n.y = n.cy * h + (rnd() - 0.5) * h * 0.14;
+          n.x = n.cx * w + (rnd() - 0.5) * w * 0.08;
+          n.y = n.cy * h + (rnd() - 0.5) * h * 0.08;
         }
         n.born = now;
         shown[n.id] = 1;
@@ -224,7 +255,8 @@ export default function GraphField({
       }
       sim.nodes(active);
       linkForce.links(activeLinks);
-      sim.alpha(Math.max(sim.alpha(), 0.7)).restart();
+      // soft restart — never a hard jolt
+      sim.alpha(Math.max(sim.alpha(), 0.28)).restart();
     }
 
     let dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -238,29 +270,33 @@ export default function GraphField({
       canvas.style.height = h + "px";
     }
     resize();
-    // resize clears the backing buffer; in reduced mode nothing repaints it, so do it here
     const ro = new ResizeObserver(() => {
       resize();
       if (reduced) draw(performance.now());
     });
     ro.observe(parent);
 
-    // view transform + pointer state
-    let k = 1, tx = 0, ty = 0;
-    let mx = w / 2, my = h / 2;
+    let k = 1,
+      tx = 0,
+      ty = 0;
+    let mx = w / 2,
+      my = h / 2;
     let hover = -1;
     let dragging: GNode | null = null;
     let panning = false;
     let panLast = { x: 0, y: 0 };
     const neighbors = new Set<number>();
 
-    const toGraph = (cx: number, cy: number) => ({ x: (cx - tx) / k, y: (cy - ty) / k });
+    const toGraph = (cx: number, cy: number) => ({
+      x: (cx - tx) / k,
+      y: (cy - ty) / k,
+    });
     function nodeAt(gx: number, gy: number) {
       for (let i = active.length - 1; i >= 0; i--) {
         const n = active[i];
         const dx = (n.x ?? 0) - gx;
         const dy = (n.y ?? 0) - gy;
-        const rr = n.r + 12 / k;
+        const rr = n.r + 14 / k;
         if (dx * dx + dy * dy < rr * rr) return n;
       }
       return null;
@@ -278,6 +314,7 @@ export default function GraphField({
       const rect = canvas.getBoundingClientRect();
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     };
+
     const onMove = (e: PointerEvent) => {
       const p = local(e);
       mx = p.x;
@@ -287,7 +324,7 @@ export default function GraphField({
         const g = toGraph(p.x, p.y);
         dragging.fx = g.x;
         dragging.fy = g.y;
-        sim.alphaTarget(0.15).restart();
+        sim.alphaTarget(0.12).restart();
         return;
       }
       if (panning) {
@@ -308,6 +345,7 @@ export default function GraphField({
     };
     const onDown = (e: PointerEvent) => {
       if (mode !== "interactive") return;
+      // don't steal when target is outside canvas (copy layer handles itself)
       const p = local(e);
       const g = toGraph(p.x, p.y);
       const n = nodeAt(g.x, g.y);
@@ -316,7 +354,7 @@ export default function GraphField({
         n.fx = g.x;
         n.fy = g.y;
         canvas.style.cursor = "grabbing";
-        sim.alphaTarget(0.2).restart();
+        sim.alphaTarget(0.16).restart();
       } else {
         panning = true;
         panLast = p;
@@ -328,29 +366,33 @@ export default function GraphField({
         dragging.fx = null;
         dragging.fy = null;
         dragging = null;
-        sim.alphaTarget(0.006);
+        sim.alphaTarget(0.004);
       }
       panning = false;
-      canvas.style.cursor = "grab";
+      if (mode === "interactive") canvas.style.cursor = "grab";
     };
     const onWheel = (e: WheelEvent) => {
       if (mode !== "interactive") return;
-      if (!e.ctrlKey && !e.metaKey) return; // don't hijack page scroll; zoom needs ⌘/ctrl (or pinch)
+      // never hijack page scroll — zoom only with ⌘/ctrl (or trackpad pinch)
+      if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
-      const factor = Math.exp(-e.deltaY * 0.0016);
-      const nk = Math.max(0.35, Math.min(4, k * factor));
-      tx = px - (px - tx) * (nk / k);
-      ty = py - (py - ty) * (nk / k);
+      // softer zoom curve
+      const factor = Math.exp(-e.deltaY * 0.0011);
+      const nk = Math.max(0.4, Math.min(3.2, k * factor));
+      tx = px - ((px - tx) * nk) / k;
+      ty = py - ((py - ty) * nk) / k;
       k = nk;
     };
+
     if (mode === "interactive") {
       canvas.addEventListener("pointermove", onMove);
       canvas.addEventListener("pointerdown", onDown);
       window.addEventListener("pointerup", onUp);
       canvas.addEventListener("wheel", onWheel, { passive: false });
+      canvas.style.cursor = "grab";
     } else {
       parent.addEventListener("pointermove", onMove);
     }
@@ -358,21 +400,29 @@ export default function GraphField({
     const pulses: Pulse[] = [];
     let pulseClock = 0;
     function spawnPulse() {
-      if (pulses.length > 7 || activeLinks.length === 0) return;
-      pulses.push({ link: (Math.random() * activeLinks.length) | 0, t: 0, speed: 0.006 + Math.random() * 0.01 });
+      if (pulses.length > 4 || activeLinks.length === 0) return;
+      pulses.push({
+        link: (Math.random() * activeLinks.length) | 0,
+        t: 0,
+        speed: 0.0035 + Math.random() * 0.005,
+      });
     }
 
     const growOf = (n: GNode, now: number) => {
       if (reduced || n.born == null) return 1;
       const g = Math.min(1, (now - n.born) / GROW_MS);
-      return g * g * (3 - 2 * g); // smoothstep
+      // smoother ease-out cubic
+      return 1 - Math.pow(1 - g, 3);
     };
 
     function draw(now: number) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      if (mode === "ambient") ctx.translate((mx - w / 2) * 0.01, (my - h / 2) * 0.01);
-      else {
+
+      if (mode === "ambient") {
+        // very soft parallax
+        ctx.translate((mx - w / 2) * 0.008, (my - h / 2) * 0.008);
+      } else {
         ctx.translate(tx, ty);
         ctx.scale(k, k);
       }
@@ -382,14 +432,15 @@ export default function GraphField({
         const s = l.source as GNode;
         const t = l.target as GNode;
         const g = Math.min(growOf(s, now), growOf(t, now));
-        if (g <= 0.01) continue;
+        if (g <= 0.02) continue;
         const lit = hover >= 0 && (s.id === hover || t.id === hover);
         ctx.strokeStyle = lit
-          ? `rgba(230,165,75,${0.55 * g})`
+          ? `rgba(230,165,75,${0.42 * g})`
           : hover >= 0
-            ? `rgba(243,238,229,${0.04 * g})`
-            : `rgba(243,238,229,${0.13 * g})`;
-        ctx.lineWidth = (lit ? 1.1 : 0.6) / sw;
+            ? `rgba(243,238,229,${0.035 * g})`
+            : `rgba(243,238,229,${0.11 * g})`;
+        ctx.lineWidth = (lit ? 1.0 : 0.55) / sw;
+        ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(s.x!, s.y!);
         ctx.lineTo(t.x!, t.y!);
@@ -404,10 +455,10 @@ export default function GraphField({
         const x = s.x! + (t.x! - s.x!) * p.t;
         const y = s.y! + (t.y! - s.y!) * p.t;
         ctx.beginPath();
-        ctx.arc(x, y, 2 / sw, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(230,165,75,0.95)";
-        ctx.shadowColor = "rgba(230,165,75,0.9)";
-        ctx.shadowBlur = 7;
+        ctx.arc(x, y, 1.6 / sw, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(230,165,75,0.75)";
+        ctx.shadowColor = "rgba(230,165,75,0.45)";
+        ctx.shadowBlur = 4;
         ctx.fill();
         ctx.shadowBlur = 0;
       }
@@ -415,9 +466,9 @@ export default function GraphField({
       for (const n of active) {
         const g = growOf(n, now);
         const dim = hover >= 0 && n.id !== hover && !neighbors.has(n.id);
-        ctx.globalAlpha = (dim ? 0.18 : 1) * g;
+        ctx.globalAlpha = (dim ? 0.16 : 1) * g;
         ctx.beginPath();
-        ctx.arc(n.x!, n.y!, n.r * (0.4 + 0.6 * g), 0, Math.PI * 2);
+        ctx.arc(n.x!, n.y!, n.r * (0.35 + 0.65 * g), 0, Math.PI * 2);
         ctx.fillStyle = n.id === hover ? "#f3eee5" : n.color;
         ctx.fill();
         ctx.globalAlpha = 1;
@@ -427,14 +478,26 @@ export default function GraphField({
     let raf = 0;
     let running = true;
     let lastReveal = 0;
+
     function frame(now: number) {
       if (!reduced) {
-        if (cursor < nodes.length && now - lastReveal > 45) {
-          reveal(8, now);
+        // cinema-style slow wire-up
+        if (cursor < nodes.length && now - lastReveal > REVEAL_MS) {
+          reveal(REVEAL_BATCH, now);
           lastReveal = now;
         }
+        // quiet breath when nearly settled (cinema micro-jiggle)
+        if (cursor >= nodes.length && sim.alpha() < 0.022 && !dragging) {
+          for (let i = 0; i < 3; i++) {
+            const n = active[(Math.random() * active.length) | 0];
+            if (!n || n.fx != null) continue;
+            n.vx = (n.vx ?? 0) + (Math.random() - 0.5) * 0.22;
+            n.vy = (n.vy ?? 0) + (Math.random() - 0.5) * 0.22;
+          }
+          sim.alpha(0.04).restart();
+        }
         pulseClock++;
-        if (pulseClock % 30 === 0) spawnPulse();
+        if (pulseClock % 48 === 0) spawnPulse();
         for (let i = pulses.length - 1; i >= 0; i--) {
           pulses[i].t += pulses[i].speed;
           if (pulses[i].t >= 1) pulses.splice(i, 1);
@@ -450,10 +513,12 @@ export default function GraphField({
       sim.stop();
       draw(0);
     } else {
-      // pre-seed ~40% at full size so the signature reads instantly, then grow the rest
-      const seed = Math.floor(nodes.length * 0.4);
-      reveal(seed, performance.now() - GROW_MS);
-      for (let i = 0; i < 80; i++) sim.tick();
+      // tiny seed, then soft growth (cinema "expand from seed")
+      const seed = Math.max(6, Math.floor(nodes.length * SEED_FRAC));
+      const t = performance.now();
+      reveal(seed, t - GROW_MS);
+      for (let i = 0; i < 40; i++) sim.tick();
+      lastReveal = t;
       raf = requestAnimationFrame(frame);
     }
 
@@ -464,7 +529,7 @@ export default function GraphField({
         sim.stop();
       } else if (!reduced) {
         running = true;
-        sim.alphaTarget(0.006).restart();
+        sim.alphaTarget(0.004).restart();
         raf = requestAnimationFrame(frame);
       }
     };
@@ -474,7 +539,7 @@ export default function GraphField({
         if (reduced) return;
         if (e.isIntersecting && !running) {
           running = true;
-          sim.alphaTarget(0.006).restart();
+          sim.alphaTarget(0.004).restart();
           raf = requestAnimationFrame(frame);
         } else if (!e.isIntersecting) {
           running = false;
@@ -506,7 +571,10 @@ export default function GraphField({
       ref={canvasRef}
       aria-hidden="true"
       className={className}
-      style={{ pointerEvents: mode === "interactive" ? "auto" : "none", touchAction: mode === "interactive" ? "pan-y" : undefined }}
+      style={{
+        pointerEvents: mode === "interactive" ? "auto" : "none",
+        touchAction: mode === "interactive" ? "pan-y" : undefined,
+      }}
     />
   );
 }

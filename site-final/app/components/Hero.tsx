@@ -12,7 +12,8 @@ export default function Hero() {
       id="top"
       className="relative flex min-h-svh flex-col justify-center overflow-hidden px-6 pb-20 pt-24 sm:px-10 sm:pb-24"
     >
-      <GraphField mode="ambient" className="absolute inset-0 h-full w-full" />
+      {/* hybrid: cinema soft birth + /live physics (hover · drag · pan · ⌘-zoom) */}
+      <GraphField mode="interactive" className="absolute inset-0 h-full w-full" />
 
       <div
         className="pointer-events-none absolute inset-0"
@@ -25,7 +26,11 @@ export default function Hero() {
         }}
       />
 
-      <div className="relative z-10 mx-auto w-full max-w-3xl">
+      <p className="pointer-events-none absolute right-6 top-24 z-10 hidden font-mono text-[11px] text-ink-faint sm:block">
+        hover · drag · pan · ⌘/ctrl-scroll zoom
+      </p>
+
+      <div className="pointer-events-none relative z-10 mx-auto w-full max-w-3xl">
         <p className="font-mono text-[11px] tracking-[0.18em] text-accent uppercase">
           local-first · open source · your disk
         </p>
@@ -41,7 +46,7 @@ export default function Hero() {
           Switch models, clear the window, close the laptop. Nothing walks away.
         </p>
 
-        <div className="mt-10 max-w-xl">
+        <div className="pointer-events-auto mt-10 max-w-xl">
           <CopyCommand command={INSTALL} />
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-faint">
             <span>
