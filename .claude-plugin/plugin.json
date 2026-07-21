@@ -1,0 +1,62 @@
+{
+  "name": "second-brain",
+  "description": "A file-based second brain for Claude Code: hooks auto-capture every session into an Obsidian-compatible Markdown vault, recall relevant notes into new prompts, and snapshot state before compaction. Ships a /second-brain skill to curate, search, and audit the vault.",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "keywords": ["memory", "second-brain", "obsidian", "notes", "hooks", "context-engineering"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-memory.sh\"", "timeout": 8 }
+        ]
+      },
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-resume.sh\"", "timeout": 8 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/interview-nudge.py\"" }
+        ]
+      },
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/memory-recall.sh\"", "timeout": 5 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/memory-lint.sh\"", "timeout": 5 }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/stuck-detector.sh\"", "timeout": 5 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/capture-exchange.sh\"", "timeout": 6 }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/precompact-carryover.py\"" }
+        ]
+      }
+    ]
+  }
+}

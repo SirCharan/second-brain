@@ -1,0 +1,9 @@
+# the vault is the USER's data — never commit a real one
+second-brain-vault/
+*.bak
+__pycache__/
+*.pyc
+.DS_Store
+hook-errors.log
+.embed/
+.recall-state/
