@@ -1,7 +1,9 @@
 import Nav from "./Nav";
 import Hero from "./Hero";
+import WorksWith from "./WorksWith";
 import HowItWorks from "./HowItWorks";
 import ValueProps from "./ValueProps";
+import CostSaver from "./CostSaver";
 import Compare from "./Compare";
 import Footer from "./Footer";
 
@@ -12,8 +14,10 @@ export default function PageShell({ mode }: { mode: "ambient" | "interactive" })
       <Nav mode={mode} />
       <main>
         <Hero mode={mode} />
+        <WorksWith />
         <HowItWorks />
         <ValueProps />
+        <CostSaver />
         <Compare />
       </main>
       <Footer />
