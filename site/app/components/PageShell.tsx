@@ -5,6 +5,7 @@ import HowItWorks from "./HowItWorks";
 import ValueProps from "./ValueProps";
 import CostSaver from "./CostSaver";
 import Compare from "./Compare";
+import Roadmap from "./Roadmap";
 import Footer from "./Footer";
 
 /* One page, two graph modes. Only the hero's GraphField behaviour differs. */
@@ -19,6 +20,7 @@ export default function PageShell({ mode }: { mode: "ambient" | "interactive" })
         <ValueProps />
         <CostSaver />
         <Compare />
+        <Roadmap />
       </main>
       <Footer />
     </>

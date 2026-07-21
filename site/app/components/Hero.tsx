@@ -37,15 +37,6 @@ export default function Hero({ mode }: { mode: "ambient" | "interactive" }) {
 
           <div className="mt-9 max-w-xl">
             <CopyCommand command="/plugin marketplace add SirCharan/second-brain" />
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <a
-                href="https://github.com/SirCharan/second-brain/releases/download/v0.1.0/Second.Brain.Setup_0.1.0_aarch64.dmg"
-                className="rounded-md border border-line-strong bg-surface-2/60 px-4 py-2 text-sm text-ink transition-colors hover:border-accent/50 hover:text-accent"
-              >
-                Download the Mac app
-              </a>
-              <span className="text-xs text-ink-faint">Apple Silicon · right-click → Open (unsigned)</span>
-            </div>
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-faint">
               <span>
                 or <code className="font-mono text-ink-dim">./install.sh</code>
