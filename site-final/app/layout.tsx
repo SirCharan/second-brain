@@ -9,13 +9,14 @@ const gambarino = localFont({
   weight: "400",
 });
 
-const SITE = "https://second-brain-final-psi.vercel.app";
+/* Public launch URL (multi-zone). Child origin still serves under basePath. */
+const SITE = "https://charandeepkapoor.com/second-brain";
 
 export const metadata: Metadata = {
   title: "second-brain — the chat ends. the memory stays.",
   description:
     "Local-first AI memory as Markdown on your disk. Capture every session, recall in any model. Open source, no account.",
-  metadataBase: new URL(SITE),
+  metadataBase: new URL("https://charandeepkapoor.com"),
   openGraph: {
     title: "second-brain — the chat ends. the memory stays.",
     description:
@@ -28,6 +29,9 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "second-brain — the chat ends. the memory stays.",
     description: "Local-first, file-based AI memory. Own your mind; rent the model.",
+  },
+  alternates: {
+    canonical: SITE,
   },
 };
 

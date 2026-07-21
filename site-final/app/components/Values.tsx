@@ -1,8 +1,12 @@
 /** Sticky left column + scrolling value list — scroll behavior locked from /v2 cut. */
 const ROWS = [
   {
-    title: "Skills compound across projects",
-    body: "One linked vault, not a silo per repo. A fix from last month shows up when you need it. Knowledge stacks instead of scattering into dead chats.",
+    title: "It never forgets last week",
+    body: "The retry params you set on Tuesday, the bug you fixed last session, the decision you already paid for. It lands in Obsidian and stays. Clear the chat; the vault still knows.",
+  },
+  {
+    title: "Project A carries into project B",
+    body: "One linked vault, not a silo per repo. What you learned shipping A shows up when you start B. Skills stack across projects instead of dying in dead chats.",
   },
   {
     title: "Own it. Switch freely.",
@@ -18,7 +22,7 @@ const ROWS = [
   },
   {
     title: "It fills itself",
-    body: "Obsidian-compatible notes, captured as you work. The vault you meant to keep by hand, building on its own.",
+    body: "Obsidian-compatible notes, captured as you work. The vault you meant to keep by hand, building on its own. Always remembering.",
   },
 ];
 
@@ -37,8 +41,8 @@ export default function Values() {
               <span className="text-ink-dim">not in the chat.</span>
             </h2>
             <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-dim">
-              Vendor memory is a moat. second-brain is a folder. That is the whole product
-              thesis, stated plainly.
+              Vendor memory is a moat. second-brain is a folder that never forgets: last
+              week&apos;s fix, last month&apos;s params, and what project A taught you for B.
             </p>
           </div>
 
