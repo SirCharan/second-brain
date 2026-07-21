@@ -41,8 +41,8 @@ export default function Values() {
               <span className="text-ink-dim">not in the chat.</span>
             </h2>
             <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-dim">
-              Vendor memory is a moat. second-brain is a folder that never forgets: last
-              week&apos;s fix, last month&apos;s params, and what project A taught you for B.
+              Vendor memory is a moat. second-brain is a folder. That is the whole product
+              thesis, stated plainly.
             </p>
           </div>
 
