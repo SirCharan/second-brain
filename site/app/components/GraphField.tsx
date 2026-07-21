@@ -33,12 +33,13 @@ type GNode = {
 type GLink = { source: GNode | number; target: GNode | number; _on?: boolean };
 type Pulse = { link: number; t: number; speed: number };
 
+// anchors pulled toward centre so the clusters read as ONE vault, not islands
 const COMMUNITIES = [
-  { key: "coral", palette: ["#e2532f", "#e0603a", "#d9542c", "#e86a42"], cx: 0.72, cy: 0.66 },
-  { key: "tan", palette: ["#c9a35f", "#b8935a", "#caa869", "#bd9a54"], cx: 0.46, cy: 0.5 },
-  { key: "yellow", palette: ["#e8c94a", "#ecd24f", "#f0d84a", "#e3c24d"], cx: 0.22, cy: 0.42 },
-  { key: "brown", palette: ["#8a6f4a", "#9c7d50", "#7d6543"], cx: 0.4, cy: 0.72 },
-  { key: "fan", palette: ["#c9a35f", "#caa869", "#d8b878"], cx: 0.78, cy: 0.24 },
+  { key: "coral", palette: ["#e2532f", "#e0603a", "#d9542c", "#e86a42"], cx: 0.64, cy: 0.62 },
+  { key: "tan", palette: ["#c9a35f", "#b8935a", "#caa869", "#bd9a54"], cx: 0.48, cy: 0.52 },
+  { key: "yellow", palette: ["#e8c94a", "#ecd24f", "#f0d84a", "#e3c24d"], cx: 0.3, cy: 0.46 },
+  { key: "brown", palette: ["#8a6f4a", "#9c7d50", "#7d6543"], cx: 0.44, cy: 0.64 },
+  { key: "fan", palette: ["#c9a35f", "#caa869", "#d8b878"], cx: 0.72, cy: 0.3 },
   { key: "grey", palette: ["#b9b3ab", "#a7a199"], cx: 0.5, cy: 0.5 },
 ];
 
@@ -121,9 +122,14 @@ function buildGraph(seed: number, scale: number) {
     }
   }
 
-  for (let i = 0; i < hubIds.length; i++)
-    if (rnd() < 0.8) addLink(hubIds[i], hubIds[(i + 1) % hubIds.length]);
+  for (let i = 0; i < hubIds.length; i++) addLink(hubIds[i], hubIds[(i + 1) % hubIds.length]);
   addLink(hubIds[1], fanHub.id);
+  // extra cross-community links so the middle fills and it reads as one graph
+  for (let i = 0; i < 22; i++) {
+    const a = (rnd() * nodes.length) | 0;
+    const b = (rnd() * nodes.length) | 0;
+    if (nodes[a].comm !== nodes[b].comm && nodes[a].comm !== 5 && nodes[b].comm !== 5) addLink(a, b);
+  }
 
   for (const n of nodes) n.r = 2.3 + Math.min(n.deg, 40) * 0.32;
   return { nodes, links };
@@ -232,7 +238,11 @@ export default function GraphField({
       canvas.style.height = h + "px";
     }
     resize();
-    const ro = new ResizeObserver(resize);
+    // resize clears the backing buffer; in reduced mode nothing repaints it, so do it here
+    const ro = new ResizeObserver(() => {
+      resize();
+      if (reduced) draw(performance.now());
+    });
     ro.observe(parent);
 
     // view transform + pointer state
@@ -250,7 +260,7 @@ export default function GraphField({
         const n = active[i];
         const dx = (n.x ?? 0) - gx;
         const dy = (n.y ?? 0) - gy;
-        const rr = n.r + 4 / k;
+        const rr = n.r + 12 / k;
         if (dx * dx + dy * dy < rr * rr) return n;
       }
       return null;
@@ -294,7 +304,7 @@ export default function GraphField({
         if (nnid >= 0) computeNeighbors(nnid);
         else neighbors.clear();
       }
-      canvas.style.cursor = "grab";
+      canvas.style.cursor = n ? "pointer" : "grab";
     };
     const onDown = (e: PointerEvent) => {
       if (mode !== "interactive") return;
@@ -325,6 +335,7 @@ export default function GraphField({
     };
     const onWheel = (e: WheelEvent) => {
       if (mode !== "interactive") return;
+      if (!e.ctrlKey && !e.metaKey) return; // don't hijack page scroll; zoom needs ⌘/ctrl (or pinch)
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
       const px = e.clientX - rect.left;
@@ -377,7 +388,7 @@ export default function GraphField({
           ? `rgba(230,165,75,${0.55 * g})`
           : hover >= 0
             ? `rgba(243,238,229,${0.04 * g})`
-            : `rgba(243,238,229,${0.09 * g})`;
+            : `rgba(243,238,229,${0.13 * g})`;
         ctx.lineWidth = (lit ? 1.1 : 0.6) / sw;
         ctx.beginPath();
         ctx.moveTo(s.x!, s.y!);
@@ -418,8 +429,8 @@ export default function GraphField({
     let lastReveal = 0;
     function frame(now: number) {
       if (!reduced) {
-        if (cursor < nodes.length && now - lastReveal > 55) {
-          reveal(6, now);
+        if (cursor < nodes.length && now - lastReveal > 45) {
+          reveal(8, now);
           lastReveal = now;
         }
         pulseClock++;
@@ -436,8 +447,13 @@ export default function GraphField({
     if (reduced) {
       reveal(nodes.length, 0);
       for (let i = 0; i < 400; i++) sim.tick();
+      sim.stop();
       draw(0);
     } else {
+      // pre-seed ~40% at full size so the signature reads instantly, then grow the rest
+      const seed = Math.floor(nodes.length * 0.4);
+      reveal(seed, performance.now() - GROW_MS);
+      for (let i = 0; i < 80; i++) sim.tick();
       raf = requestAnimationFrame(frame);
     }
 
@@ -490,7 +506,7 @@ export default function GraphField({
       ref={canvasRef}
       aria-hidden="true"
       className={className}
-      style={{ pointerEvents: mode === "interactive" ? "auto" : "none", touchAction: mode === "interactive" ? "none" : undefined }}
+      style={{ pointerEvents: mode === "interactive" ? "auto" : "none", touchAction: mode === "interactive" ? "pan-y" : undefined }}
     />
   );
 }

@@ -12,7 +12,7 @@ export default function Nav({ mode }: { mode: "ambient" | "interactive" }) {
         </a>
         <div className="flex items-center gap-1.5">
           {/* graph-mode toggle — the two versions, active shown by weight+color, no dot */}
-          <div className="mr-1 hidden items-center rounded-full border border-line p-0.5 text-sm sm:flex">
+          <div className="mr-1 flex items-center rounded-full border border-line p-0.5 text-xs sm:text-sm">
             <a
               href="/"
               className={`rounded-full px-3 py-1 transition-colors ${

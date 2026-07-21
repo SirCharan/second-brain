@@ -48,7 +48,7 @@ export default function Compare() {
     <section id="compare" className="px-6 py-24 sm:px-10 sm:py-28">
       <div className="mx-auto max-w-5xl">
         <h2 className="max-w-2xl font-display text-[clamp(1.9rem,3.6vw,2.9rem)] leading-tight">
-          The niche nobody else fully owns.
+          Local files. Any model. No account.
         </h2>
         <p className="mt-4 max-w-xl text-ink-dim">
           Local <span className="text-ink">and</span> file-based{" "}
@@ -56,11 +56,12 @@ export default function Compare() {
           <span className="text-ink">and</span> hands-free. Most tools give you one or two.
         </p>
 
-        <div className="mt-12 overflow-x-auto">
+        <p className="mt-8 font-mono text-xs text-ink-faint sm:hidden">swipe the table →</p>
+        <div className="mt-3 overflow-x-auto sm:mt-12">
           <table className="w-full min-w-[640px] border-collapse text-left text-sm">
             <thead>
               <tr>
-                <th className="w-[26%] py-3 pr-4 font-normal text-ink-faint">&nbsp;</th>
+                <th className="sticky left-0 z-10 w-[26%] bg-bg py-3 pr-4 font-normal text-ink-faint">&nbsp;</th>
                 {COLS.map((c, i) => (
                   <th
                     key={c}
@@ -78,7 +79,7 @@ export default function Compare() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.label} className="border-t border-line">
-                  <th scope="row" className="py-3.5 pr-4 text-left font-normal text-ink-dim">
+                  <th scope="row" className="sticky left-0 z-10 bg-bg py-3.5 pr-4 text-left font-normal text-ink-dim">
                     {r.label}
                   </th>
                   {r.cells.map((cell, i) => (
@@ -96,10 +97,10 @@ export default function Compare() {
         </div>
 
         <p className="mt-6 max-w-2xl text-sm leading-relaxed text-ink-faint">
-          Peers earn their keep, honestly: Basic Memory and Pieces add semantic search;
-          mem0 adds knowledge-graph retrieval at agent scale. second-brain trades that
-          for zero-infra, no-account ownership and native Claude Code fit: grep and
-          plain Markdown over a database.
+          Where peers beat us: Basic Memory and Pieces add semantic search; mem0 adds
+          knowledge-graph retrieval at agent scale. second-brain trades that for
+          zero-infra, no-account ownership and native Claude Code fit: grep and plain
+          Markdown over a database.
         </p>
       </div>
     </section>

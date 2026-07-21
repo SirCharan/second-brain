@@ -9,13 +9,57 @@ export const contentType = "image/png";
 
 const gambarino = readFileSync(join(process.cwd(), "app/og/Gambarino-Regular.ttf"));
 
-// a small, deterministic node cluster (nodes = notes) for the top-right field
-const DOTS = [
-  [880, 90, 7, "#e6a54b"], [960, 140, 4, "#e8c56a"], [1030, 96, 5, "#f0e7d6"],
-  [910, 200, 5, "#d98a3d"], [1000, 220, 9, "#e6a54b"], [1080, 170, 4, "#e8c56a"],
-  [850, 160, 4, "#f0e7d6"], [1090, 250, 5, "#e6a54b"], [960, 300, 4, "#e8c56a"],
-  [1040, 320, 6, "#e6a54b"], [900, 280, 4, "#d98a3d"], [1120, 120, 3, "#f0e7d6"],
-] as const;
+/* Build a small connected graph (communities + edges + a fan) so the social
+   unfurl shows the actual product, not a sparse dot field. */
+function graphSvg() {
+  let s = 0x2f6b1a3d;
+  const rnd = () => {
+    s |= 0;
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  type P = { x: number; y: number; r: number; c: string };
+  const nodes: P[] = [];
+  const links: [number, number][] = [];
+  const clusters = [
+    { x: 300, y: 300, n: 20, pal: ["#e2532f", "#e0603a", "#d9542c"] },
+    { x: 200, y: 170, n: 13, pal: ["#c9a35f", "#b8935a", "#caa869"] },
+    { x: 90, y: 250, n: 8, pal: ["#e8c94a", "#ecd24f"] },
+  ];
+  for (const cl of clusters) {
+    const hub = nodes.length;
+    nodes.push({ x: cl.x, y: cl.y, r: 9, c: cl.pal[0] });
+    for (let i = 1; i < cl.n; i++) {
+      const a = rnd() * Math.PI * 2;
+      const d = 26 + rnd() * 70;
+      const idx = nodes.length;
+      nodes.push({ x: cl.x + Math.cos(a) * d, y: cl.y + Math.sin(a) * d, r: 3 + rnd() * 3, c: cl.pal[(rnd() * cl.pal.length) | 0] });
+      if (rnd() < 0.7) links.push([idx, hub]);
+      if (rnd() < 0.4) links.push([idx, hub + ((rnd() * (idx - hub)) | 0)]);
+    }
+  }
+  const fanHub = nodes.length;
+  nodes.push({ x: 430, y: 110, r: 10, c: "#caa869" });
+  for (let i = 0; i < 18; i++) {
+    const a = (-0.2 + (i / 18) * 2.0) * Math.PI;
+    const d = 44 + (i % 3) * 12;
+    const idx = nodes.length;
+    nodes.push({ x: 430 + Math.cos(a) * d, y: 110 + Math.sin(a) * d, r: 2.5 + rnd() * 1.5, c: "#c9a35f" });
+    links.push([idx, fanHub]);
+  }
+  links.push([0, 20], [20, 33], [0, fanHub]);
+
+  const l = links
+    .map(([a, b]) => `<line x1="${nodes[a].x.toFixed(1)}" y1="${nodes[a].y.toFixed(1)}" x2="${nodes[b].x.toFixed(1)}" y2="${nodes[b].y.toFixed(1)}" stroke="rgba(243,238,229,0.18)" stroke-width="1"/>`)
+    .join("");
+  const c = nodes
+    .map((n) => `<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.r.toFixed(1)}" fill="${n.c}"/>`)
+    .join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="540" height="440" viewBox="-10 20 540 440">${l}${c}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
 
 export default function OG() {
   return new ImageResponse(
@@ -25,39 +69,25 @@ export default function OG() {
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-end",
           background: "#0c0a09",
           padding: "72px",
           position: "relative",
           fontFamily: "Gambarino",
         }}
       >
-        {DOTS.map(([x, y, r, c], i) => (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: x,
-              top: y,
-              width: r * 2,
-              height: r * 2,
-              borderRadius: r,
-              background: c as string,
-            }}
-          />
-        ))}
-        <div style={{ display: "flex", fontSize: 104, color: "#f3eee5", letterSpacing: "-0.02em" }}>
-          second-brain
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={graphSvg()} width={540} height={440} style={{ position: "absolute", right: 30, top: 95 }} alt="" />
+
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", width: "100%" }}>
+          <div style={{ display: "flex", fontSize: 104, color: "#f3eee5", letterSpacing: "-0.02em" }}>second-brain</div>
+          <div style={{ display: "flex", flexWrap: "wrap", marginTop: 18, fontSize: 44, color: "#a99f91" }}>
+            Your second brain,&nbsp;<span style={{ color: "#e6a54b" }}>wired to every model.</span>
+          </div>
+          <div style={{ display: "flex", marginTop: 40, fontSize: 26, color: "#8a8074" }}>
+            local-first AI memory · github.com/SirCharan/second-brain
+          </div>
+          <div style={{ position: "absolute", left: 72, bottom: 60, width: 64, height: 3, background: "#e6a54b" }} />
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", marginTop: 18, fontSize: 44, color: "#a99f91" }}>
-          Your second brain,&nbsp;
-          <span style={{ color: "#e6a54b" }}>wired to every model.</span>
-        </div>
-        <div style={{ display: "flex", marginTop: 40, fontSize: 26, color: "#8a8074" }}>
-          local-first AI memory · github.com/SirCharan/second-brain
-        </div>
-        <div style={{ position: "absolute", left: 72, bottom: 60, width: 64, height: 3, background: "#e6a54b" }} />
       </div>
     ),
     { ...size, fonts: [{ name: "Gambarino", data: gambarino, style: "normal", weight: 400 }] },

@@ -24,13 +24,13 @@ export default function CopyCommand({
   return (
     <button
       onClick={copy}
-      className="group flex w-full items-center gap-3 rounded-md border border-line bg-surface/70 px-4 py-3 text-left font-mono text-sm text-ink transition-colors hover:border-line-strong hover:bg-surface-2/70"
+      className="group flex w-full items-start gap-3 rounded-md border border-line bg-surface/70 px-4 py-3 text-left font-mono text-xs leading-relaxed text-ink transition-colors hover:border-line-strong hover:bg-surface-2/70 sm:text-sm"
       aria-label={`Copy: ${command}`}
     >
-      <span className="select-none text-accent">{prompt}</span>
-      <code className="min-w-0 flex-1 truncate">{command}</code>
+      <span className="select-none pt-px text-accent">{prompt}</span>
+      <code className="min-w-0 flex-1 break-words">{command}</code>
       <span
-        className="shrink-0 select-none text-xs text-ink-faint transition-colors group-hover:text-ink-dim"
+        className="shrink-0 select-none pt-px text-xs text-ink-faint transition-colors group-hover:text-ink-dim"
         aria-live="polite"
       >
         {copied ? "copied" : "copy"}

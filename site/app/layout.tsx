@@ -9,13 +9,13 @@ const gambarino = localFont({
   weight: "400",
 });
 
-const SITE = "https://github.com/SirCharan/second-brain";
+const SITE = "https://second-brain-rho-dusky.vercel.app";
 
 export const metadata: Metadata = {
   title: "second-brain — your memory, every model, your disk",
   description:
-    "A local-first, file-based memory for AI assistants. Own it, switch models freely, never run out of context. Open source for Claude Code.",
-  metadataBase: new URL("https://second-brain-rho-dusky.vercel.app"),
+    "Local-first, file-based memory for AI assistants. Own it, switch models freely, never run out of context. Open source, installs with Claude Code or one shell script.",
+  metadataBase: new URL(SITE),
   openGraph: {
     title: "second-brain — your memory, every model, your disk",
     description:

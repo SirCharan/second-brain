@@ -21,7 +21,7 @@ export default function Footer() {
             GitHub
           </a>
           <a href={`${REPO}/blob/main/POSITIONING.md`} target="_blank" rel="noreferrer" className="transition-colors hover:text-ink">
-            Positioning
+            Why we built it
           </a>
           <a href={`${REPO}#install`} target="_blank" rel="noreferrer" className="transition-colors hover:text-ink">
             Install guide

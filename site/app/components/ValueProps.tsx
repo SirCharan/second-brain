@@ -87,25 +87,25 @@ export default function ValueProps() {
     <section className="px-6 py-24 sm:px-10 sm:py-28">
       <div className="mx-auto max-w-5xl">
         <h2 className="max-w-2xl font-display text-[clamp(1.9rem,3.6vw,2.9rem)] leading-tight">
-          Not another memory silo. A brain you own.
+          Memory on your disk, not in the chat.
         </h2>
 
         <div className="mt-12 grid gap-4 lg:grid-cols-3">
           <Prop
             kind="neuron"
             title="Skills compound across projects"
-            body="Everything lands in one linked vault, not per-project silos. A trick learned in one project surfaces, and links itself in, when you start the next. The graph fires like neurons; every project makes the next one smarter."
+            body="Everything lands in one linked vault, not per-project silos. A trick learned in one project surfaces, and links itself in, when you start the next. Every project makes the next one smarter."
             className="lg:col-span-2"
           />
           <Prop
             kind="own"
-            title="Own it. Switch freely."
-            body="Your memory is plain files on your disk. Move between ChatGPT, Claude, Gemini and Grok; it comes with you, because it was never trapped in any of them."
+            title="Own it, switch models freely"
+            body="Your memory is plain files on your disk. Move between ChatGPT, Claude, Gemini and Grok; it comes with you, because it never lived inside any of them."
           />
           <Prop
             kind="models"
-            title="One brain, every model"
-            body="The same vault feeds any assistant. Nothing siloed, nothing to re-explain when you change tools."
+            title="Just Markdown, no account"
+            body="Wikilinked .md files. Works offline, versions in git, needs no server or login. If the tool vanished tomorrow, you'd still have every note."
           />
           <Prop
             kind="context"

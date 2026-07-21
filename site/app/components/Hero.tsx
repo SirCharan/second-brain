@@ -19,7 +19,7 @@ export default function Hero({ mode }: { mode: "ambient" | "interactive" }) {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "linear-gradient(to top, var(--color-bg) 5%, rgba(12,10,9,0.72) 26%, rgba(12,10,9,0.22) 50%, transparent 72%)",
+            "radial-gradient(72% 58% at 26% 80%, rgba(12,10,9,0.84), transparent 72%), linear-gradient(to top, var(--color-bg) 5%, rgba(12,10,9,0.6) 24%, rgba(12,10,9,0.16) 52%, transparent 74%)",
         }}
       />
 
@@ -35,7 +35,7 @@ export default function Hero({ mode }: { mode: "ambient" | "interactive" }) {
             your disk, then feeds the right notes back to whatever model you open next.
           </p>
 
-          <div className="mt-9 max-w-md">
+          <div className="mt-9 max-w-xl">
             <CopyCommand command="/plugin marketplace add SirCharan/second-brain" />
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-faint">
               <span>
@@ -59,7 +59,7 @@ export default function Hero({ mode }: { mode: "ambient" | "interactive" }) {
       {/* interaction hint, only where it applies */}
       {mode === "interactive" && (
         <div className="pointer-events-none absolute right-6 top-24 z-10 hidden font-mono text-xs text-ink-faint sm:block">
-          scroll to zoom · drag to pan · hover a node
+          hover a node · drag to pan · ⌘/ctrl-scroll to zoom
         </div>
       )}
     </section>
