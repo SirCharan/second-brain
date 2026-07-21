@@ -94,13 +94,13 @@ export default function ValueProps() {
           <Prop
             kind="neuron"
             title="Skills compound across projects"
-            body="Everything lands in one linked vault, not per-project silos. A trick learned in one project surfaces — and links itself in — when you start the next. The graph fires like neurons; every project makes the next one smarter."
+            body="Everything lands in one linked vault, not per-project silos. A trick learned in one project surfaces, and links itself in, when you start the next. The graph fires like neurons; every project makes the next one smarter."
             className="lg:col-span-2"
           />
           <Prop
             kind="own"
             title="Own it. Switch freely."
-            body="Your memory is plain files on your disk. Move between ChatGPT, Claude, Gemini and Grok — it comes with you, because it was never trapped in any of them."
+            body="Your memory is plain files on your disk. Move between ChatGPT, Claude, Gemini and Grok; it comes with you, because it was never trapped in any of them."
           />
           <Prop
             kind="models"
@@ -115,7 +115,7 @@ export default function ValueProps() {
           <Prop
             kind="grow"
             title="A second brain that fills itself"
-            body="Obsidian-compatible, wikilinked notes, captured hands-free from your real work. The knowledge base you'd build anyway — building itself."
+            body="Obsidian-compatible, wikilinked notes, captured hands-free from your real work. The knowledge base you'd build anyway, building itself."
           />
         </div>
       </div>

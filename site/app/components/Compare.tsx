@@ -98,7 +98,7 @@ export default function Compare() {
         <p className="mt-6 max-w-2xl text-sm leading-relaxed text-ink-faint">
           Peers earn their keep, honestly: Basic Memory and Pieces add semantic search;
           mem0 adds knowledge-graph retrieval at agent scale. second-brain trades that
-          for zero-infra, no-account ownership and native Claude Code fit — grep and
+          for zero-infra, no-account ownership and native Claude Code fit: grep and
           plain Markdown over a database.
         </p>
       </div>

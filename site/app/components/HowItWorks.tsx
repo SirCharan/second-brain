@@ -11,7 +11,7 @@ export default function HowItWorks() {
         </h2>
         <p className="mt-4 max-w-xl text-ink-dim">
           Memory lives in the vault, not the conversation. So you can end a session,
-          free the context, switch models — and pick up exactly where you were.
+          free the context, switch models, then pick up exactly where you were.
         </p>
 
         <div className="mt-14 grid items-stretch gap-4 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
@@ -34,7 +34,7 @@ export default function HowItWorks() {
                 <span className="text-ink">$ /clear</span>
               </p>
               <p className="text-ink-faint">no compaction. no bloated history.</p>
-              <p className="pt-1 text-ink-faint">the window is empty again —</p>
+              <p className="pt-1 text-ink-faint">the window is empty again.</p>
               <p className="text-ink-faint">the vault still remembers.</p>
             </div>
           </Terminal>

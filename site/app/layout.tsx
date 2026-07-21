@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   title: "second-brain — your memory, every model, your disk",
   description:
     "A local-first, file-based memory for AI assistants. Own it, switch models freely, never run out of context. Open source for Claude Code.",
-  metadataBase: new URL("https://second-brain.dev"),
+  metadataBase: new URL("https://second-brain-rho-dusky.vercel.app"),
   openGraph: {
     title: "second-brain — your memory, every model, your disk",
     description:
