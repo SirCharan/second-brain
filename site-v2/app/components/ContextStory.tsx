@@ -42,9 +42,13 @@ const PHASE_MS: Record<Phase, number> = {
 const PHASE_ORDER: Phase[] = ["fill", "pressure", "choice", "aftermath"];
 
 // --- Token economics (transparent assumptions) ---
+// Claude Opus 4.8 API: $5 / MTok input, $25 / MTok output (claude.com/pricing).
+// Context re-carry tax is input tokens only.
 const WINDOW = 1_000_000; // 1M context window
 const BASELINE_PCT = 50; // "healthy" re-carry ceiling
-const PRICE_PER_MTOK = 3; // $/1M input tokens (Sonnet-class illustrative)
+const PRICE_PER_MTOK = 5; // Opus 4.8 input $/1M tokens
+const PRICE_OUT_PER_MTOK = 25; // Opus 4.8 output (shown in footnote only)
+const MODEL_LABEL = "Claude Opus 4.8";
 const QUERIES_PER_DAY = 40; // heavy Claude Code day
 
 const CTX_LEVELS = [60, 70, 80, 90, 100] as const;
@@ -569,11 +573,12 @@ function TokenEconomics() {
           <span className="mono text-fg-dim">
             extra = 1M × (usage% − 50%)
           </span>
-          . Price shown at{" "}
+          . Costs use{" "}
+          <span className="mono text-fg">{MODEL_LABEL}</span> API rates:{" "}
           <span className="mono text-fg">
-            ${PRICE_PER_MTOK.toFixed(2)} / 1M input tokens
-          </span>{" "}
-          (Sonnet-class illustrative — swap in your model rate).
+            ${PRICE_PER_MTOK}/MTok input · ${PRICE_OUT_PER_MTOK}/MTok output
+          </span>
+          . The tax below is input only (history re-carried each query).
         </p>
       </div>
 
@@ -587,12 +592,12 @@ function TokenEconomics() {
         <StatCard
           label="extra cost / query"
           value={`$${extraDollars(80).toFixed(2)}`}
-          hint={`@ $${PRICE_PER_MTOK}/MTok input`}
+          hint={`${MODEL_LABEL} · $${PRICE_PER_MTOK}/MTok input`}
         />
         <StatCard
           label="saved with second-brain"
           value={`$${saveAt90.perDay.toFixed(0)}/day`}
-          hint={`if you were at 90% · ${QUERIES_PER_DAY} queries/day`}
+          hint={`90% → ≤50% · ${QUERIES_PER_DAY} q/day · Opus 4.8`}
           accent
         />
       </div>
@@ -663,11 +668,12 @@ function TokenEconomics() {
           <span className="mono text-fg-dim">
             +${extraDollars(90).toFixed(2)}
           </span>{" "}
-          / query at ${PRICE_PER_MTOK}/MTok). second-brain keeps the durable
-          memory in Markdown on disk and recalls a small slice, so you can{" "}
-          <span className="mono text-fg-dim">/clear</span> and live under 50%.
-          The “saved” column is that tax going to zero — not magic free tokens,
-          just not paying twice for history you already know.
+          / query on {MODEL_LABEL} at ${PRICE_PER_MTOK}/MTok input). second-brain
+          keeps the durable memory in Markdown on disk and recalls a small
+          slice, so you can <span className="mono text-fg-dim">/clear</span> and
+          live under 50%. The “saved” column is that input tax going to zero —
+          not free tokens, just not re-paying Opus rates for history you already
+          wrote down.
         </p>
         <div className="rounded-lg border border-accent/30 bg-bg px-4 py-3 sm:min-w-[220px]">
           <p className="text-[11px] text-muted">example: 90% → ≤50%</p>
