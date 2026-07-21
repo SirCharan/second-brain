@@ -94,28 +94,28 @@ export default function ValueProps() {
           <Prop
             kind="neuron"
             title="Skills compound across projects"
-            body="Everything lands in one linked vault, not per-project silos. A trick learned in one project surfaces, and links itself in, when you start the next. Every project makes the next one smarter."
+            body="One linked vault, not per-project silos. A fix from one project shows up in the next. Your knowledge stacks instead of scattering."
             className="lg:col-span-2"
           />
           <Prop
             kind="own"
-            title="Own it, switch models freely"
-            body="Your memory is plain files on your disk. Move between ChatGPT, Claude, Gemini and Grok; it comes with you, because it never lived inside any of them."
+            title="Own it, switch freely"
+            body="Plain files on your disk. Jump between ChatGPT, Claude, Gemini and Grok; the memory follows you."
           />
           <Prop
             kind="models"
-            title="Just Markdown, no account"
-            body="Wikilinked .md files. Works offline, versions in git, needs no server or login. If the tool vanished tomorrow, you'd still have every note."
+            title="Just Markdown. No account."
+            body="Wikilinked .md files. Offline, git-versioned, no server, no login. Delete the tool and you keep every note."
           />
           <Prop
             kind="context"
             title="Never run out. Never compact."
-            body="Memory lives in the vault, not the window. Recall only what's relevant, /clear freely, and skip the slow, lossy compaction that eats your tokens."
+            body="Memory lives in the vault, not the window. Recall only what matters, and skip the slow compaction that burns your tokens."
           />
           <Prop
             kind="grow"
-            title="A second brain that fills itself"
-            body="Obsidian-compatible, wikilinked notes, captured hands-free from your real work. The knowledge base you'd build anyway, building itself."
+            title="It fills itself"
+            body="Obsidian-compatible notes, captured hands-free as you work. The vault you'd build by hand, building on its own."
           />
         </div>
       </div>

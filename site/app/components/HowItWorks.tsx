@@ -10,8 +10,8 @@ export default function HowItWorks() {
           Write it once. Recall it anywhere.
         </h2>
         <p className="mt-4 max-w-xl text-ink-dim">
-          Memory lives in the vault, not the conversation. So you can end a session,
-          free the context, switch models, then pick up exactly where you were.
+          Memory lives in the vault, not the chat. Clear the window, switch models, close
+          the laptop. Nothing&apos;s lost.
         </p>
 
         <div className="mt-14 grid items-stretch gap-4 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">

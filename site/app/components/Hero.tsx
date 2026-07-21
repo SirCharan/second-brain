@@ -26,13 +26,13 @@ export default function Hero({ mode }: { mode: "ambient" | "interactive" }) {
       <div className="relative z-10 mx-auto w-full max-w-5xl">
         <div className="max-w-2xl">
           <h1 className="font-display text-[clamp(2.7rem,6.4vw,5rem)] leading-[1.01] tracking-tight">
-            Your second brain,
+            Your AI forgets.
             <br />
-            <span className="text-accent">wired to every model.</span>
+            <span className="text-accent">Your vault doesn&apos;t.</span>
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-ink-dim">
-            Local-first memory for AI assistants. It saves every session to Markdown on
-            your disk, then feeds the right notes back to whatever model you open next.
+            Local-first memory for AI assistants. Every session lands in Markdown you own,
+            and any model reads it back.
           </p>
 
           <div className="mt-9 max-w-xl">

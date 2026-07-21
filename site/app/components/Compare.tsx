@@ -51,9 +51,7 @@ export default function Compare() {
           Local files. Any model. No account.
         </h2>
         <p className="mt-4 max-w-xl text-ink-dim">
-          Local <span className="text-ink">and</span> file-based{" "}
-          <span className="text-ink">and</span> cross-model{" "}
-          <span className="text-ink">and</span> hands-free. Most tools give you one or two.
+          Local, file-based, cross-model, hands-free. Most tools manage one.
         </p>
 
         <p className="mt-8 font-mono text-xs text-ink-faint sm:hidden">swipe the table →</p>
