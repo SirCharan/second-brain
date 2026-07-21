@@ -123,7 +123,7 @@ async function init() {
     }
   });
 
-  btnCheck?.addEventListener("click", async () => {
+  async function runCheck() {
     setBusy(btnCheck, true, "Checking…");
     markStep("step-1", "active");
     try {
@@ -140,12 +140,11 @@ async function init() {
               : "";
             let hint = "";
             if (!t.ok && t.hint) {
-              const linked = linkifyHint(escapeHtml(t.hint));
               // Claude Code missing: force known URL
               if (t.name === "Claude Code") {
                 hint = `<span class="tool-hint"><a href="${CLAUDE_URL}" data-external="${CLAUDE_URL}">Install Claude Code</a></span>`;
               } else {
-                hint = `<span class="tool-hint">${linked}</span>`;
+                hint = `<span class="tool-hint">${linkifyHint(escapeHtml(t.hint))}</span>`;
               }
             }
             return `<li>${mark}<div><span class="tool-name">${escapeHtml(t.name)}</span>${path}${hint}</div></li>`;
@@ -182,7 +181,14 @@ async function init() {
     } finally {
       setBusy(btnCheck, false, "Check");
     }
+  }
+
+  btnCheck?.addEventListener("click", () => {
+    void runCheck();
   });
+
+  // auto-check after listeners are wired
+  void runCheck();
 
   btnInstall?.addEventListener("click", async () => {
     const vault = vaultInput?.value.trim() || "";

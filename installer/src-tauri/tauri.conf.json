@@ -15,9 +15,9 @@
       {
         "title": "Second Brain Setup",
         "width": 720,
-        "height": 620,
+        "height": 700,
         "minWidth": 640,
-        "minHeight": 520,
+        "minHeight": 560,
         "resizable": true,
         "center": true
       }
