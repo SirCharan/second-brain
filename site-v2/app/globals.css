@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+/* Halide cinema — tungsten darkroom for local AI memory.
+   One accent (amber), cool slate secondary, no purple. */
+
+:root {
+  --bg: #050408;
+  --bg-elevated: #0c0a10;
+  --surface: #12101a;
+  --fg: #f2ede4;
+  --fg-dim: #a39e96;
+  --muted: #6e6874;
+  --accent: #d4a054;
+  --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+  --accent-hot: #e8b86a;
+  --cool: #6b8fa3;
+  --cool-soft: color-mix(in srgb, var(--cool) 14%, transparent);
+  --border: #2a2634;
+  --border-soft: color-mix(in srgb, var(--border) 55%, transparent);
+  --danger: #c45c5c;
+  --letterbox: #020104;
+  --grain-opacity: 0.045;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-fg-dim: var(--fg-dim);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-hot: var(--accent-hot);
+  --color-cool: var(--cool);
+  --color-cool-soft: var(--cool-soft);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-letterbox: var(--letterbox);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body), ui-sans-serif, sans-serif;
+  font-feature-settings: "ss01" on, "cv11" on;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--fg);
+}
+
+/* Film grain — atmosphere without a grid or purple glow blob */
+.grain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.letterbox {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: clamp(10px, 1.6vw, 18px);
+  background: var(--letterbox);
+  z-index: 60;
+  pointer-events: none;
+}
+
+.letterbox-top {
+  top: 0;
+}
+
+.letterbox-bottom {
+  bottom: 0;
+}
+
+/* Focus — real ring, no glow soup */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Display measure */
+.display {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  line-height: 0.95;
+}
+
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-feature-settings: "ss01" on;
+}
+
+/* Soft vignette over the orrery only */
+.vignette {
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 60% at 55% 45%,
+    transparent 0%,
+    transparent 45%,
+    color-mix(in srgb, var(--bg) 55%, transparent) 75%,
+    var(--bg) 100%
+  );
+}
