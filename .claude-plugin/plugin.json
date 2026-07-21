@@ -27,6 +27,11 @@
         "hooks": [
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/memory-recall.sh\"", "timeout": 5 }
         ]
+      },
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/context-monitor.sh\"", "timeout": 5 }
+        ]
       }
     ],
     "PostToolUse": [

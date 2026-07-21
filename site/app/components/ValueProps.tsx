@@ -109,8 +109,8 @@ export default function ValueProps() {
           />
           <Prop
             kind="context"
-            title="Never run out. Never compact."
-            body="Memory lives in the vault, not the window. Recall only what matters, and skip the slow compaction that burns your tokens."
+            title="Never run out. Costs less."
+            body="Memory lives in the vault, not the window. Near ~50% full it dumps to disk; you /clear and restart near-empty, so far fewer tokens get re-sent each turn. Cheaper, and no slow compaction."
           />
           <Prop
             kind="grow"

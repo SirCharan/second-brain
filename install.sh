@@ -46,6 +46,7 @@ FRAG = {
   "UserPromptSubmit": [
     {"hooks":[{"type":"command","command":cmd('python3 "HOOKS/interview-nudge.py"')}]},
     {"hooks":[{"type":"command","command":cmd('bash "HOOKS/memory-recall.sh"'),"timeout":5}]},
+    {"hooks":[{"type":"command","command":cmd('bash "HOOKS/context-monitor.sh"'),"timeout":5}]},
   ],
   "PostToolUse": [
     {"matcher":"Edit|Write","hooks":[{"type":"command","command":cmd('bash "HOOKS/memory-lint.sh"'),"timeout":5}]},
@@ -58,7 +59,7 @@ FRAG = {
     {"hooks":[{"type":"command","command":cmd('python3 "HOOKS/precompact-carryover.py"')}]},
   ],
 }
-OURS = ("session-memory","session-resume","interview-nudge","memory-recall",
+OURS = ("session-memory","session-resume","interview-nudge","memory-recall","context-monitor",
         "memory-lint","stuck-detector","capture-exchange","precompact-carryover")
 d = {}
 if os.path.exists(settings):
