@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "second-brain",
+  "description": "A file-based second brain for Claude Code — auto-captured, recalled, Obsidian-compatible memory.",
+  "owner": {
+    "name": "SirCharan",
+    "url": "https://github.com/SirCharan"
+  },
+  "plugins": [
+    {
+      "name": "second-brain",
+      "description": "Hooks auto-capture sessions into an Obsidian-compatible vault, recall relevant notes into prompts, and snapshot state before compaction; a /second-brain skill curates and searches it.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}
