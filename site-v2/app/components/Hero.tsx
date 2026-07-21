@@ -42,7 +42,7 @@ export default function Hero() {
         </div>
 
         <p className="mt-16 hidden text-[11px] tracking-[0.14em] text-muted uppercase sm:block">
-          move the cursor · nodes light their notes
+          hover a node · drag to pan · graph grows like Obsidian
         </p>
       </div>
     </section>
