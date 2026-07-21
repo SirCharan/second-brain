@@ -1,0 +1,42 @@
+import CopyCommand from "./CopyCommand";
+import { GitHubMark } from "./Mark";
+
+const REPO = "https://github.com/SirCharan/second-brain";
+
+export default function Footer() {
+  return (
+    <footer className="relative overflow-hidden border-t border-line px-6 pt-24 sm:px-10">
+      <div className="mx-auto max-w-5xl">
+        {/* CTA — one clear action, composed, not a gradient slab */}
+        <p className="font-display text-[clamp(2rem,4.5vw,3.4rem)] leading-tight">
+          Own your mind. <span className="text-accent">Rent the model.</span>
+        </p>
+        <div className="mt-8 max-w-md">
+          <CopyCommand command="/plugin marketplace add SirCharan/second-brain" />
+        </div>
+
+        <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm text-ink-dim">
+          <a href={REPO} target="_blank" rel="noreferrer" className="flex items-center gap-2 transition-colors hover:text-ink">
+            <GitHubMark size={15} />
+            GitHub
+          </a>
+          <a href={`${REPO}/blob/main/POSITIONING.md`} target="_blank" rel="noreferrer" className="transition-colors hover:text-ink">
+            Positioning
+          </a>
+          <a href={`${REPO}#install`} target="_blank" rel="noreferrer" className="transition-colors hover:text-ink">
+            Install guide
+          </a>
+          <span className="text-ink-faint">Apache-2.0</span>
+        </div>
+      </div>
+
+      {/* oversized wordmark: on top of the grain, anchored to the very bottom edge,
+          bleeding slightly off while the caps clear the top. A composition, not filler. */}
+      <div className="mt-20 flex items-end justify-center" aria-hidden="true">
+        <span className="translate-y-[0.12em] select-none font-display text-[clamp(3.4rem,19vw,15rem)] leading-none tracking-tight text-ink/[0.07]">
+          second-brain
+        </span>
+      </div>
+    </footer>
+  );
+}

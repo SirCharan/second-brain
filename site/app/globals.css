@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/* ── one world: warm near-black + a single tonal amber, held with discipline ── */
+@theme {
+  --color-bg: #0c0a09;
+  --color-surface: #15120e;
+  --color-surface-2: #1e1913;
+  --color-ink: #f3eee5;
+  --color-ink-dim: #a99f91;
+  --color-ink-faint: #8a8074;
+  --color-accent: #e6a54b;
+  --color-accent-dim: #977a45;
+  --color-line: color-mix(in oklab, #f3eee5 9%, transparent);
+  --color-line-strong: color-mix(in oklab, #f3eee5 16%, transparent);
+
+  --font-display: var(--font-gambarino), Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  --shadow-lift: 0 1px 0 color-mix(in oklab, #f3eee5 8%, transparent) inset,
+    0 12px 30px -18px rgba(0, 0, 0, 0.9);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv01", "ss01";
+  overflow-x: hidden;
+}
+
+/* fine grain on the substrate — BEHIND content, never over it */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* warm directional wash from top — authored light, not a centered radial halo */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 80% at 15% -10%,
+    color-mix(in oklab, var(--color-accent) 7%, transparent),
+    transparent 55%
+  );
+}
+
+main,
+nav,
+footer {
+  position: relative;
+  z-index: 1;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* selection in the brand amber, tonal */
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 30%, transparent);
+  color: var(--color-ink);
+}
+
+/* focus ring — visible, on-brand */
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-accent) 70%, transparent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* the recall pulse traveling a graph edge (the signature motion) */
+@keyframes edge-pulse {
+  0% { stroke-dashoffset: 42; opacity: 0; }
+  12% { opacity: 1; }
+  60% { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes node-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes nav-in {
+  from { transform: translateY(-10px); opacity: 0.6; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* content is VISIBLE by default; motion only enhances already-on-screen elements */
+@media (prefers-reduced-motion: no-preference) {
+  .nav-in { animation: nav-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .g-pulse { animation: edge-pulse 3.4s cubic-bezier(0.4, 0, 0.3, 1) infinite; }
+  .g-node { animation: node-breathe 4.5s ease-in-out infinite; }
+}
