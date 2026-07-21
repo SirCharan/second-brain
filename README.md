@@ -24,6 +24,8 @@ second-brain flips that. Your memory is a folder of plain Markdown on **your** d
 - **One brain feeds every model** — the same vault is readable by any assistant; nothing is siloed.
 - **Your context stays lean** — only the relevant notes are recalled into each prompt, and the index
   is *sharded* so `MEMORY.md` never overflows the model's read limit no matter how much you capture.
+- **Skills compound across projects** — it's one linked vault, not per-project silos, so a trick
+  learned in project A surfaces (and links in) when you work on project B — like neurons wiring up.
 - **Sessions stop resetting** — captured automatically, recalled automatically, and if this tool
   vanished tomorrow you'd still have every file.
 

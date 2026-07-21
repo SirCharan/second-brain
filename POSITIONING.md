@@ -42,7 +42,7 @@ treat them as directional.
 | 4 | **Privacy-constrained pros** (legal / medical / finance) | Highest willingness to pay | They legally *can't* paste client/patient data into vendor clouds. Local-first isn't a preference, it's compliance. Needs packaging + trust, not just tooling. |
 | 5 | **Teams wanting shared institutional memory** | Expansion, not wedge | A Markdown vault is a git-shareable knowledge base — onboarding, decisions, "why did we do X". |
 
-## 3. The four strongest value props
+## 3. The five strongest value props
 
 Each maps a real pain to a concrete mechanism in the tool.
 
@@ -80,6 +80,18 @@ That last point is the answer to "my MEMORY.md keeps overflowing": it structural
 Obsidian-compatible, `[[wikilinked]]`, frontmatter-versioned notes — the personal knowledge base
 you'd want anyway, except it fills itself from your actual work and you can open it in Obsidian for
 the graph view. If the tool vanished tomorrow, you'd still have every file.
+
+### E. The neuron effect — skills compound across projects
+Because every project's memory lands in *one* linked vault instead of a separate silo, what you
+learn in one place carries into the next. A debugging trick discovered in project A, a deploy gotcha
+from project B, a prompt pattern that worked in C — all become notes that recall and `[[wikilink]]`
+into each other. The graph starts firing like neurons: work on something new and the relevant past
+lesson surfaces on its own, even though it came from an unrelated project. This is the core
+Zettelkasten promise — *emergent connections between ideas* — applied to your AI work, and it's
+precisely what siloed memory can't do. Per-app memory is either **scoped per project** (Claude
+Projects keep memory inside a single project) or an **undifferentiated blob** (ChatGPT's one memory
+pool with no links); neither gives you cross-project *associative* transfer. Every project you do
+makes the next one smarter.
 
 ## 4. Competitive landscape (honest)
 
@@ -120,14 +132,16 @@ reacting against.
 > walls. Your context becomes their moat. second-brain flips it: your memory is a folder of plain
 > Markdown files on your own disk. Every assistant reads and writes the same folder, so you can
 > switch models on a whim and never re-explain yourself. Sessions stop resetting. Your index never
-> overflows. And if every AI company disappeared tomorrow, you'd still have every note. Own your
-> mind; rent the model.
+> overflows. And because it's all one linked graph, a lesson learned in one project fires when you
+> start the next — your knowledge compounds instead of scattering. If every AI company disappeared
+> tomorrow, you'd still have every note. Own your mind; rent the model.
 
 **Taglines:**
 - *Your memory. Every model. Your disk.*
 - *One brain for every AI — owned by you.*
 - *Stop renting your memory back from the model that stored it.*
 - *Switch models on a whim. Keep your mind.*
+- *Every project makes the next one smarter.*
 - *Local-first memory for LLMs.*
 
 ## 7. Sources
