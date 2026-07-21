@@ -7,3 +7,14 @@ __pycache__/
 hook-errors.log
 .embed/
 .recall-state/
+.ruff_cache/
+
+# build artifacts + local video/demo output (not shipped machinery)
+node_modules/
+.next/
+**/node_modules/
+**/.next/
+brag-output/
+brag-output-*/
+launch/
+site-final/launch-video/

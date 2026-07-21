@@ -22,6 +22,7 @@ second-brain flips that. Your memory is a folder of plain Markdown on **your** d
 - **You own it and can switch models freely** — move between ChatGPT, Claude, Gemini, and Grok and
   your memory comes with you, because it was never trapped in any of them.
 - **One brain feeds every model** — the same vault is readable by any assistant; nothing is siloed.
+  `/second-brain export` flattens it into one portable file to hand to ChatGPT, Gemini, or Grok.
 - **Never run out of context, never compact, never waste tokens** — memory lives in the vault, not
   the window, so only the relevant notes are recalled into each prompt. You can `/clear` and start
   fresh cheaply instead of sitting through a slow, lossy compaction or re-paying for a bloated
@@ -113,7 +114,12 @@ See [`config.example.json`](config.example.json) for a worked example.
 | `prune` | Propose (never auto-apply) archive/merge candidates |
 | `migrate` | Backfill frontmatter to v2 on older notes |
 | `index` | Rebuild the `_system/` folder + project table |
-| `doctor [--fix]` | Self-test the install; `--fix` repairs dirs and drift |
+| `doctor [--fix]` | Self-test the install (plugin **or** install.sh); `--fix` repairs dirs and drift |
+| `export [--format …]` | Flatten the whole vault into one portable context file for any model |
+| `graph` | Emit a Mermaid `[[wikilink]]` link-graph of the vault |
+| `stale [--days N]` | List active notes not confirmed in N+ days |
+| `dump` | Write a resume digest to `_infra/_carryover.md` before a `/clear` |
+| `embed-setup` | Enable optional semantic recall (one isolated venv; the core stays stdlib) |
 
 ## Vault conventions
 
@@ -131,13 +137,22 @@ See [`config.example.json`](config.example.json) for a worked example.
 
 Hooks are built to stay out of your way: pinned to `/usr/bin/python3` (pyenv-proof),
 `timeout`-bounded, atomic writes (temp + `os.replace`), transcript **tail**-reads (never load a
-20MB transcript), a `hook-errors.log` for silent failures, and `vault_ok()` no-op guards. Pure
-stdlib — no pip installs.
+20MB transcript), a `hook-errors.log` (under `~/.second-brain/`, or `$SECOND_BRAIN_STATE_DIR`) for
+silent failures, `vault_ok()` no-op guards, and self-locating paths that work in both the plugin
+and install.sh layouts.
+
+The **core is pure stdlib** — capture, recall, curation, and every skill command run with zero pip
+installs. Semantic recall (embedding-based note matching) is the one **opt-in** extra: run
+`/second-brain embed-setup` to build an isolated venv with `fastembed`. Without it, recall stays
+keyword-only and everything degrades cleanly.
 
 ## Privacy
 
 The vault is **your** data and is git-ignored by this repo. The machinery ships with zero personal
-content. Optionally mirror the vault into your Obsidian app folder by setting
+content. Captured turns are **scrubbed** for high-confidence secret shapes (API keys, tokens,
+private keys, JWTs) before they touch disk. Set `SECOND_BRAIN_GIT_AUTOCOMMIT=1` to have each
+session commit the vault, so "git-auditable, never lose a note" is literally true (init a git repo
+in the vault first). Optionally mirror the vault into your Obsidian app folder by setting
 `SECOND_BRAIN_OBSIDIAN_LINK` to that path (then `doctor --fix` maintains the symlink).
 
 ## License

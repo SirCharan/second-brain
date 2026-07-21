@@ -13,7 +13,9 @@ Writes _infra/_carryover.md and appends a one-line marker to today's Daily note.
 import sys, os, json, glob, re
 from datetime import datetime
 
-sys.path.insert(0, os.path.expanduser("~/.claude/hooks"))
+sys.path.insert(
+    0, os.path.dirname(os.path.abspath(__file__))
+)  # _hooklib is a sibling (both install modes)
 import _hooklib as HL
 
 
@@ -95,7 +97,7 @@ def main():
         out += ["## Unresolved errors", *[f"- {e}" for e in errors], ""]
     out += ["## Related", "- [[_MOC-infra]]", ""]
     path = os.path.join(HL.MEM, "_infra", "_carryover.md")
-    HL.atomic_write(path, "\n".join(out))
+    HL.atomic_write(path, HL.scrub_secrets("\n".join(out)))
     print(f"dumped → {path} ({len(files)} files, {len(commands)} cmds)")
 
 

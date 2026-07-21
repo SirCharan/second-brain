@@ -9,7 +9,11 @@ try:
 except Exception:
     HL = None
 
-STATE_DIR = os.path.expanduser("~/.claude/hooks/.stuck-state")
+STATE_DIR = (
+    os.path.join(HL.STATE_DIR, ".stuck-state")
+    if HL
+    else os.path.expanduser("~/.second-brain/.stuck-state")
+)
 THRESHOLD = 2
 FAIL = re.compile(
     r"command not found|No such file or directory|Traceback \(most recent call last\)|"

@@ -14,7 +14,9 @@ Never blocks. Prints a JSON additionalContext block only when over threshold.
 
 import sys, os, json
 
-sys.path.insert(0, os.path.expanduser("~/.claude/hooks"))
+sys.path.insert(
+    0, os.path.dirname(os.path.abspath(__file__))
+)  # _hooklib is a sibling (both install modes)
 try:
     import _hooklib as HL
 except Exception:
@@ -22,7 +24,11 @@ except Exception:
 
 WINDOW = int(os.environ.get("SECOND_BRAIN_CTX_WINDOW", "200000") or 200000)
 PCT = float(os.environ.get("SECOND_BRAIN_DUMP_PCT", "50") or 50)
-STATE_DIR = os.path.expanduser("~/.claude/hooks/.ctx-monitor")
+STATE_DIR = (
+    os.path.join(HL.STATE_DIR, ".ctx-monitor")
+    if HL
+    else os.path.expanduser("~/.second-brain/.ctx-monitor")
+)
 
 
 def last_usage_tokens(tpath):
@@ -82,9 +88,9 @@ def main():
 
     msg = (
         f"\U0001f9e0 CONTEXT {fill:.0f}% full ({tokens:,}/{WINDOW:,} tokens). To cut cost: "
-        f"run `/obsidian dump` (or `python3 ~/.claude/hooks/context-dump.py`) to save this "
-        f"session's state to the vault, then `/clear`. The next turns restart near-empty and "
-        f"session-resume reloads the digest. Skip only if you're about to finish."
+        f"run `/second-brain dump` to save this session's state to the vault, then `/clear`. "
+        f"The next turns restart near-empty and session-resume reloads the digest. "
+        f"Skip only if you're about to finish."
     )
     sys.stdout.write(
         json.dumps(

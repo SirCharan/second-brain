@@ -8,13 +8,50 @@ HOME = os.path.expanduser("~")
 MEM = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.join(
     HOME, ".claude/second-brain-vault"
 )
-HOOKS = os.path.join(HOME, ".claude/hooks")
+# Locate the hooks dir + how hooks are registered — works in BOTH install modes:
+#   plugin:     <plugin_root>/hooks   registered in <plugin_root>/.claude-plugin/plugin.json
+#   install.sh: ~/.claude/hooks       registered in ~/.claude/settings.json
+_SCRIPTDIR = os.path.dirname(os.path.abspath(__file__))
+_CANDIDATES = [
+    (
+        os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], "hooks")
+        if os.environ.get("CLAUDE_PLUGIN_ROOT")
+        else None
+    ),
+    os.path.join(
+        _SCRIPTDIR, "..", "..", "..", "hooks"
+    ),  # plugin layout: skills/second-brain/scripts → root/hooks
+    os.path.join(HOME, ".claude/hooks"),  # install.sh layout
+]
+HOOKS = next(
+    (
+        os.path.abspath(p)
+        for p in _CANDIDATES
+        if p and os.path.isfile(os.path.join(p, "_hooklib.py"))
+    ),
+    os.path.join(HOME, ".claude/hooks"),
+)
+PLUGIN_JSON = os.path.abspath(
+    os.path.join(HOOKS, "..", ".claude-plugin", "plugin.json")
+)
+IS_PLUGIN = os.path.isfile(PLUGIN_JSON)
+# plugin.json and settings.json share the same {"hooks": {...}} shape, so the same parse works.
+SETTINGS = PLUGIN_JSON if IS_PLUGIN else os.path.join(HOME, ".claude/settings.json")
+STATE_DIR = os.environ.get("SECOND_BRAIN_STATE_DIR") or os.path.join(
+    HOME, ".second-brain"
+)
 # Optional: mirror the vault into your Obsidian app's folder. Set SECOND_BRAIN_OBSIDIAN_LINK
 # to that path to enable the symlink check/repair; leave unset to skip it.
 VAULT_LINK = os.environ.get("SECOND_BRAIN_OBSIDIAN_LINK", "")
-SETTINGS = os.path.join(HOME, ".claude/settings.json")
 FIX = "--fix" in sys.argv
 rows = []
+rows.append(
+    (
+        "PASS",
+        "install mode",
+        ("plugin" if IS_PLUGIN else "install.sh (~/.claude)") + f" · hooks: {HOOKS}",
+    )
+)
 
 
 def chk(name, ok, detail="", warn=False):
@@ -127,7 +164,7 @@ try:
         warn=True,
     )
 except Exception as e:
-    chk("settings.json parse", False, repr(e))
+    chk(("plugin.json" if IS_PLUGIN else "settings.json") + " parse", False, repr(e))
 # migration drift
 notes = [
     p
@@ -175,7 +212,7 @@ chk(
     warn=True,
 )
 # error log tail
-elog = os.path.join(HOOKS, "hook-errors.log")
+elog = os.path.join(STATE_DIR, "hook-errors.log")
 if os.path.exists(elog):
     tail = open(elog, errors="ignore").read().strip().splitlines()[-3:]
     chk(

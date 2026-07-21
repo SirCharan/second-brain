@@ -95,15 +95,15 @@ def _emit_stats(proj):
         HL.log_err("memory-recall.stats", e)
 
 
-VENV_PY = os.path.expanduser("~/.claude/hooks/.venv-embed/bin/python")
-EMBED = os.path.expanduser("~/.claude/hooks/memory-embed.py")
+VENV_PY = HL.EMBED_VENV_PY  # optional semantic-embed venv (built by `sb-embed setup`)
+EMBED = HL.EMBED_SCRIPT
 RETIRED = ("retired", "deprecated", "archived", "superseded")
 
 
 def _semantic_fill(prompt, exclude, need):
     """Guarded semantic fallback: shell into the embed venv, return [(name, folder, desc)].
     Only fills `need` slots keyword recall left empty. No-op if venv/index/deps missing."""
-    if need <= 0 or not os.path.exists(VENV_PY) or not os.path.exists(EMBED):
+    if need <= 0 or not HL.embed_ready():
         return []
     try:
         import subprocess

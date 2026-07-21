@@ -5,7 +5,23 @@ _MOC-system) and _projects.md + per-MOC Links blocks. Idempotent. Local vault on
 import os, re, glob, shutil, sys
 
 _here = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.expanduser("~/.claude/hooks"))
+_HD = next(
+    (
+        p
+        for p in (
+            os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], "hooks")
+            if os.environ.get("CLAUDE_PLUGIN_ROOT")
+            else None,
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "hooks"
+            ),
+            os.path.expanduser("~/.claude/hooks"),
+        )
+        if p and os.path.isfile(os.path.join(p, "_hooklib.py"))
+    ),
+    os.path.expanduser("~/.claude/hooks"),
+)
+sys.path.insert(0, _HD)
 sys.path.insert(0, os.path.join(_here, "..", "..", "..", "hooks"))
 try:
     import _hooklib as HL

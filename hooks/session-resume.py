@@ -166,9 +166,9 @@ def main():
     # Refresh the semantic index in the background (incremental; no-op if venv absent).
     # Detached so it never blocks session start.
     try:
-        venv = os.path.expanduser("~/.claude/hooks/.venv-embed/bin/python")
-        embed = os.path.expanduser("~/.claude/hooks/memory-embed.py")
-        if os.path.exists(venv) and os.path.exists(embed):
+        venv = HL.EMBED_VENV_PY
+        embed = HL.EMBED_SCRIPT
+        if HL.embed_ready():
             import subprocess
 
             subprocess.Popen(

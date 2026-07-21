@@ -91,6 +91,45 @@ def _write_session_note(now, sid, proj, branch, entry, links):
         HL.log_err("capture-exchange.session-note", e)
 
 
+def _git_autocommit(now):
+    """Opt-in: commit the vault after each session so it is genuinely git-auditable.
+    Enable with SECOND_BRAIN_GIT_AUTOCOMMIT=1. No-op unless the vault is a git repo and
+    something changed. Quiet, timeout-bounded, never raises."""
+    if not os.environ.get("SECOND_BRAIN_GIT_AUTOCOMMIT"):
+        return
+    try:
+        import subprocess
+
+        if not os.path.isdir(os.path.join(HL.MEM, ".git")):
+            return
+        st = subprocess.run(
+            ["git", "-C", HL.MEM, "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if not st.stdout.strip():
+            return
+        subprocess.run(
+            ["git", "-C", HL.MEM, "add", "-A"], capture_output=True, timeout=15
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                HL.MEM,
+                "commit",
+                "-q",
+                "-m",
+                "second-brain: session capture " + now.strftime("%Y-%m-%d %H:%M"),
+            ],
+            capture_output=True,
+            timeout=15,
+        )
+    except Exception as e:
+        HL.log_err("capture-exchange.autocommit", e)
+
+
 def main():
     if not HL.vault_ok():
         return
@@ -140,6 +179,10 @@ def main():
             )
             if txt.strip():
                 last_asst = txt.strip()
+
+    # redact high-confidence secret token shapes before any raw turn text hits disk
+    last_user = HL.scrub_secrets(last_user)
+    last_asst = HL.scrub_secrets(last_asst)
 
     captured_type = None
     m = re.search(r"<!--\s*CAPTURE:\s*(.*?)\s*-->", last_asst or "", re.S)
@@ -207,6 +250,9 @@ def main():
                 f.write(f"- [ ] {day} {now.strftime('%H:%M')}{ctx} — {entry}\n")
         except Exception as e:
             HL.log_err("capture-exchange.queue", e)
+
+    # opt-in (SECOND_BRAIN_GIT_AUTOCOMMIT=1): commit the vault so it's genuinely git-auditable
+    _git_autocommit(now)
 
 
 if __name__ == "__main__":
