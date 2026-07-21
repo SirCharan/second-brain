@@ -31,8 +31,8 @@ export default function Hero({ mode }: { mode: "ambient" | "interactive" }) {
             <span className="text-accent">wired to every model.</span>
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-ink-dim">
-            Local-first memory for your AI assistants. Capture a session once, recall
-            it in any model, and keep every byte on your own disk.
+            Local-first memory for AI assistants. It saves every session to Markdown on
+            your disk, then feeds the right notes back to whatever model you open next.
           </p>
 
           <div className="mt-9 max-w-md">
