@@ -10,6 +10,26 @@ No database, no server, no Obsidian plugins at runtime. Just Markdown files with
 YAML frontmatter, and a handful of stdlib-only Python/bash hooks. Open the vault in
 [Obsidian](https://obsidian.md) if you want the graph view — it's plain Markdown either way.
 
+## Why
+
+Every AI vendor is racing to remember you — and to make sure that memory only works inside *their*
+walls. ChatGPT's memory can't leave ChatGPT (it isn't even in the data export); Claude's lives on
+Anthropic's servers; Gemini's is tied to your Google account. Your accumulated context becomes their
+moat, and every new session still starts from zero.
+
+second-brain flips that. Your memory is a folder of plain Markdown on **your** disk, so:
+
+- **You own it and can switch models freely** — move between ChatGPT, Claude, Gemini, and Grok and
+  your memory comes with you, because it was never trapped in any of them.
+- **One brain feeds every model** — the same vault is readable by any assistant; nothing is siloed.
+- **Your context stays lean** — only the relevant notes are recalled into each prompt, and the index
+  is *sharded* so `MEMORY.md` never overflows the model's read limit no matter how much you capture.
+- **Sessions stop resetting** — captured automatically, recalled automatically, and if this tool
+  vanished tomorrow you'd still have every file.
+
+The full argument — who it's for, the competitive landscape, and where it honestly *doesn't* win —
+is in **[POSITIONING.md](POSITIONING.md)**.
+
 ## How it works
 
 ```
