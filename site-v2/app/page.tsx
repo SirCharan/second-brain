@@ -1,6 +1,7 @@
 import Nav from "./components/Nav";
 import Hero from "./components/Hero";
 import FilmStrip from "./components/FilmStrip";
+import ContextStory from "./components/ContextStory";
 import Why from "./components/Why";
 import Install from "./components/Install";
 import Footer from "./components/Footer";
@@ -11,6 +12,7 @@ export default function Home() {
       <Nav />
       <Hero />
       <FilmStrip />
+      <ContextStory />
       <Why />
       <Install />
       <Footer />
