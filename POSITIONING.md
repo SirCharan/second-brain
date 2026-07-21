@@ -63,18 +63,29 @@ standard, with an ecosystem that grew from ~100k to millions of server downloads
 [Anthropic](https://www.anthropic.com/news/model-context-protocol)) A plain-file memory layer is the
 simplest thing that works across every one of those clients — no per-vendor integration to rot.
 
-### C. Free your context — and never let the index overflow
-This is the engineering heart. second-brain:
+### C. Free your context — stop running out, stop compacting, stop wasting tokens
+This is the engineering heart. Today a long chat fills the window until three bad things happen: it
+**rots** (recall degrades as tokens pile up), it triggers a **slow, lossy compaction** (a minute-plus
+pause that summarizes your history away and quietly drops detail), and every turn **re-carries a
+bloated transcript** you pay for again and again — a session pinned at `ctx:100%` is burning tokens
+to remember things badly.
+
+second-brain fixes this by keeping your memory in the *vault*, outside the window, so you stop
+leaning on the conversation as memory:
 - **auto-captures** each session into `Daily/` so nothing depends on your memory or the model's,
-- **recalls just-in-time** — only the notes relevant to the current prompt enter the window, the
-  direct countermeasure to context rot,
-- **snapshots before compaction** so the high-signal state (task, files, decisions) survives when
-  the window is squeezed, and
+- **recalls just-in-time** — only the handful of notes relevant to *this* prompt enter the window,
+  the direct countermeasure to context rot (and to paying for a full history every turn),
+- lets you **`/clear` and start fresh cheaply** — the next session reloads what matters from the
+  vault, so you rarely need to let a chat grow to the point of compaction at all,
+- **snapshots before compaction** so if it does happen, the high-signal state (task, files,
+  decisions) survives instead of being summarized away, and
 - **shards its index**: `MEMORY.md` stays a thin table of contents that grows with *folders*, not
   *notes* (per-folder `_index-*` shards hold the detail), so the index never blows past the model's
   read cap no matter how many hundreds of notes accumulate.
 
-That last point is the answer to "my MEMORY.md keeps overflowing": it structurally can't.
+Net effect: you effectively **never run out of context** (it isn't held in the window), **never sit
+through a compaction**, and **never re-pay for a bloated transcript**. "My `MEMORY.md` keeps
+overflowing" also stops being possible — it structurally can't.
 
 ### D. Build a real second brain, hands-free
 Obsidian-compatible, `[[wikilinked]]`, frontmatter-versioned notes — the personal knowledge base
@@ -142,6 +153,7 @@ reacting against.
 - *Stop renting your memory back from the model that stored it.*
 - *Switch models on a whim. Keep your mind.*
 - *Every project makes the next one smarter.*
+- *Never compact a conversation again.*
 - *Local-first memory for LLMs.*
 
 ## 7. Sources

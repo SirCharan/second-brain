@@ -22,8 +22,10 @@ second-brain flips that. Your memory is a folder of plain Markdown on **your** d
 - **You own it and can switch models freely** — move between ChatGPT, Claude, Gemini, and Grok and
   your memory comes with you, because it was never trapped in any of them.
 - **One brain feeds every model** — the same vault is readable by any assistant; nothing is siloed.
-- **Your context stays lean** — only the relevant notes are recalled into each prompt, and the index
-  is *sharded* so `MEMORY.md` never overflows the model's read limit no matter how much you capture.
+- **Never run out of context, never compact, never waste tokens** — memory lives in the vault, not
+  the window, so only the relevant notes are recalled into each prompt. You can `/clear` and start
+  fresh cheaply instead of sitting through a slow, lossy compaction or re-paying for a bloated
+  transcript every turn. The index is *sharded* too, so `MEMORY.md` never overflows the read limit.
 - **Skills compound across projects** — it's one linked vault, not per-project silos, so a trick
   learned in project A surfaces (and links in) when you work on project B — like neurons wiring up.
 - **Sessions stop resetting** — captured automatically, recalled automatically, and if this tool
