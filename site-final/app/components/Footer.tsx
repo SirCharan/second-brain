@@ -7,10 +7,13 @@ const INSTALL = "/plugin marketplace add SirCharan/second-brain";
 /** Closing CTA + giant wordmark — locked from screenshot cut. */
 export default function Footer() {
   return (
-    <footer className="relative overflow-hidden border-t border-line px-6 pt-24 sm:px-10">
+    <footer className="relative z-10 overflow-hidden border-t border-line px-6 pt-24 sm:px-10">
       <div className="mx-auto max-w-6xl">
         <p className="font-display text-[clamp(2.1rem,5vw,3.6rem)] leading-[1.05]">
           Own your mind. <span className="text-accent">Rent the model.</span>
+        </p>
+        <p className="mt-4 max-w-md text-[15px] leading-relaxed text-ink-dim">
+          Install the plugin, keep working. The vault grows under you.
         </p>
 
         <div className="mt-8 max-w-md">

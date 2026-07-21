@@ -21,7 +21,7 @@ export default function PromiseStrip() {
   return (
     <section
       aria-label="Core promises"
-      className="border-y border-line bg-bg px-6 py-16 sm:px-10 sm:py-20"
+      className="border-t border-line bg-surface/25 px-6 py-16 sm:px-10 sm:py-20"
     >
       <div className="mx-auto grid max-w-6xl gap-12 sm:grid-cols-3 sm:gap-10">
         {PROMISES.map((p) => (

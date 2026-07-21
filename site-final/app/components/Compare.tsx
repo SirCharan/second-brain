@@ -48,7 +48,7 @@ function CellView({ cell }: { cell: Cell }) {
 
 export default function Compare() {
   return (
-    <section id="compare" className="px-6 py-24 sm:px-10 sm:py-28">
+    <section id="compare" className="border-t border-line px-6 py-24 sm:px-10 sm:py-28">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
           <h2 className="font-display text-[clamp(2rem,3.8vw,3.1rem)] leading-[1.05]">
