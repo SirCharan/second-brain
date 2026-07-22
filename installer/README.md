@@ -12,8 +12,8 @@ Wraps `install.sh` so non-technical users can wire Claude Code + an Obsidian vau
 5. **Optional:** wires the MCP server into Claude Desktop + Cursor by running
    `python3 mcp/mcp-setup.py --write` (`setup_mcp` command → the "Connect other apps" step)
 
-Step 5 is the previously-deferred v2 MCP setup. ChatGPT is a separate remote endpoint
-(read-only, no-auth, behind a cloudflared tunnel) — set up from a terminal, not this
+Step 5 — the MCP "Connect other apps" wiring — ships in 0.4.0. ChatGPT is a separate remote
+endpoint (optional/experimental, currently paused) — set up from a terminal, not this
 installer; see `mcp/README.md`.
 
 > Verifying the UI end-to-end needs the Tauri toolchain (`npm run tauri dev`, Rust) —

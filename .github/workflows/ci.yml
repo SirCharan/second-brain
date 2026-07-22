@@ -33,3 +33,51 @@ jobs:
 
       - name: MCP test
         run: python3 mcp/test_mcp.py
+
+      - name: dedup self-test
+        run: python3 skills/second-brain/scripts/dedup.py --selftest
+
+      - name: Exercise scripts against a fixture vault
+        run: |
+          set -e
+          export CLAUDE_MEMORY_DIR="$RUNNER_TEMP/fixture-vault"
+          mkdir -p "$CLAUDE_MEMORY_DIR/proj"
+          cat > "$CLAUDE_MEMORY_DIR/proj/note-a.md" <<'EOF'
+          ---
+          name: note-a
+          title: Note A
+          description: first fixture note
+          tags: [tooling, project/proj, type/context]
+          asserted: 2020-01-01
+          last_confirmed: 2020-01-01
+          source: user
+          confidence: high
+          status: active
+          ---
+          # Note A
+          🟢 **active**
+          Links to [[note-b]].
+          EOF
+          cat > "$CLAUDE_MEMORY_DIR/proj/note-b.md" <<'EOF'
+          ---
+          name: note-b
+          title: Note B
+          description: second fixture note
+          tags: [tooling, project/proj, type/context]
+          asserted: 2020-02-01
+          last_confirmed: 2020-02-01
+          source: user
+          confidence: high
+          status: active
+          ---
+          # Note B
+          🟢 **active**
+          Back to [[note-a]].
+          EOF
+          S=skills/second-brain/scripts
+          python3 $S/export.py
+          python3 $S/graph.py
+          python3 $S/stale.py
+          python3 $S/health.py
+          python3 $S/pull.py note
+          python3 $S/find.py note

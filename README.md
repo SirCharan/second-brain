@@ -134,21 +134,30 @@ python3 mcp/mcp-setup.py            # preview the config
 python3 mcp/mcp-setup.py --write    # merge into both client configs (backs up first), then restart
 ```
 
-ChatGPT (remote): the read-only endpoint uses the official `mcp` SDK over Streamable-HTTP
-with **no authentication** (ChatGPT connectors accept OAuth or no-auth — **not** a bearer
-token), behind a cloudflared tunnel.
-
-```bash
-bash mcp/mcp-http-setup.sh          # one-time: build the venv (pip install mcp)
-bash mcp/run-chatgpt.sh             # start the server + tunnel, prints a public HTTPS URL
-```
-
-Then in ChatGPT: **Settings → Connectors → Advanced → Developer mode → Create**, paste the
-URL, Auth = No authentication. Only the read tools are exposed; writes stay local. Full
-steps + hardening (Cloudflare Access) in [`mcp/README.md`](mcp/README.md).
+ChatGPT (remote): **optional / experimental — currently paused.** A read-only remote endpoint
+(official `mcp` SDK over Streamable-HTTP behind a cloudflared tunnel) exists but is not part of the
+supported path right now. If you want to try it, the setup, tools, and hardening notes live in
+[`mcp/README.md`](mcp/README.md).
 
 Eight tools: `recall`, `pull`, `export`, `health`, `stale`, `graph` (read) and `capture`,
 `learn` (write). Full detail in [`mcp/README.md`](mcp/README.md).
+
+## Autonomous loop (advanced)
+
+`second-brain-loop.sh` runs a long task across many **fresh** `claude -p` sessions — the "ralph"
+dump-and-reset pattern. Each iteration starts with a near-empty context window, does one small
+chunk, and persists where it stopped to `_infra/_carryover.md`; the next iteration reads that back.
+Context never balloons, so a big task stays cheap without a human pressing `/clear`.
+
+```bash
+./second-brain-loop.sh "<task description>" [max_iters]   # max_iters defaults to 15
+```
+
+The loop stops early when a session writes `DONE` to `_infra/_loop-status.md`.
+
+> ⚠ **Safety:** each iteration runs `claude -p … --dangerously-skip-permissions`, so sessions
+> execute tools (including shell commands) with **no approval prompts**. Run it only on a task and
+> working directory you trust, and start with a small `max_iters`.
 
 ## Vault conventions
 

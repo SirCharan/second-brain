@@ -29,6 +29,53 @@ def desc(path):
     return (m.group(1).strip().strip('"').strip("'")[:120]) if m else ""
 
 
+def _stale_count(days=120):
+    """Cheap ambient count of active notes not confirmed in N+ days (frontmatter
+    head-read only). Mirrors skills/second-brain/scripts/stale.py. Never raises."""
+    from datetime import date
+
+    today = date.today()
+    skip = {"Daily", "Weekly", "Sessions", "_system"}
+    n, seen = 0, 0
+    for p in glob.glob(os.path.join(MEM, "*", "*.md")):
+        if seen >= 3000:
+            break
+        b = os.path.basename(p)
+        if b.startswith("_") or os.path.basename(os.path.dirname(p)) in skip:
+            continue
+        seen += 1
+        try:
+            head = open(p, errors="ignore").read(1200)
+        except Exception:
+            continue
+        m = re.match(r"^---\n(.*?)\n---", head, re.S)
+        if not m:
+            continue
+        fm = m.group(1)
+        st = re.search(r"^status:\s*(.+)$", fm, re.M)
+        if st and st.group(1).strip().strip('"').strip("'").lower() in (
+            "retired",
+            "superseded",
+            "deprecated",
+            "archived",
+        ):
+            continue
+        dm = re.search(
+            r"^last_confirmed:\s*\D*(\d{4})-(\d{2})-(\d{2})", fm, re.M
+        ) or re.search(r"^asserted:\s*\D*(\d{4})-(\d{2})-(\d{2})", fm, re.M)
+        if not dm:
+            continue
+        try:
+            age = (
+                today - date(int(dm.group(1)), int(dm.group(2)), int(dm.group(3)))
+            ).days
+        except Exception:
+            continue
+        if age > days:
+            n += 1
+    return n
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -147,6 +194,16 @@ def main():
     if os.path.exists(home):
         out.append("\n## Home map")
         out.append(open(home, errors="ignore").read())
+
+    # --- Passive stale nudge (ambient; only when there's something to nudge) ---
+    try:
+        n = _stale_count(120)
+        if n > 0:
+            out.append(
+                f"\n🕰 {n} notes not confirmed in 120+ days · run /second-brain stale"
+            )
+    except Exception as e:
+        HL.log_err("session-resume.stale", e)
 
     out.append("=== end Obsidian resume ===")
     sys.stdout.write("\n".join(out) + "\n")
