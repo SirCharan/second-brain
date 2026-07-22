@@ -1,7 +1,7 @@
 {
   "name": "second-brain",
   "description": "A file-based second brain for Claude Code: hooks auto-capture every session into an Obsidian-compatible Markdown vault, recall relevant notes into new prompts, and snapshot state before compaction. Ships a /second-brain skill to curate, search, and audit the vault.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "Apache-2.0",
   "keywords": ["memory", "second-brain", "obsidian", "notes", "hooks", "context-engineering"],
   "hooks": {

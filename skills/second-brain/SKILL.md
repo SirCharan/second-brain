@@ -35,6 +35,9 @@ Dispatch on the argument after `/second-brain`:
 - **stale `[--days N] [--folder NAME]`** — run `scripts/stale.py`; list active notes not confirmed in N+ days (default 180), oldest first, so you can re-confirm, retire, or prune them (surfaces the decay the recall ranker already uses).
 - **embed-setup** — run `bash scripts/embed-setup.sh` to enable OPTIONAL semantic recall (builds an isolated venv with `fastembed`). The core is pure stdlib; this is the one opt-in extra. Recall/resume auto-use it once present, and degrade cleanly to keyword-only without it.
 
+## MCP server
+A pure-stdlib MCP server lives in `mcp/` at the repo root. It exposes the vault to OTHER clients — Claude Desktop + Cursor (local stdio) and ChatGPT (remote HTTP) — with 8 tools: `recall`, `pull`, `export`, `health`, `stale`, `graph` (read) and `capture`, `learn` (write, via a v2-note writer). Install per client with `python3 mcp/mcp-setup.py --write`. Details in `mcp/README.md`.
+
 ## Reliability (built-in)
 Hooks are hardened for uptime: pinned to `/usr/bin/python3` (pyenv-proof), `timeout`-bounded in settings.json, atomic writes (temp+`os.replace`) on the index/state/notes, transcript **tail**-reads (not full-file), a `hook-errors.log` (under `$SECOND_BRAIN_STATE_DIR`, default `~/.second-brain/`) for silent failures, and `vault_ok()` no-op guards (so hooks stay silent until a vault exists). Shared helpers live in `_hooklib.py` next to the hooks (self-locating — works in both the plugin and install.sh layouts).
 

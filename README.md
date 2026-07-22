@@ -121,6 +121,26 @@ See [`config.example.json`](config.example.json) for a worked example.
 | `dump` | Write a resume digest to `_infra/_carryover.md` before a `/clear` |
 | `embed-setup` | Enable optional semantic recall (one isolated venv; the core stays stdlib) |
 
+## MCP server
+
+An MCP server (`mcp/`) exposes the vault to **Claude Desktop** and **Cursor** (local stdio,
+shipping now) and **ChatGPT** (remote HTTP, next) — so recall and capture work outside Claude
+Code too. Pure stdlib; no pip, no `mcp` package.
+
+Claude Desktop + Cursor:
+
+```bash
+python3 mcp/mcp-setup.py            # preview the config
+python3 mcp/mcp-setup.py --write    # merge into both client configs (backs up first), then restart
+```
+
+ChatGPT (remote): run `python3 mcp/server_http.py` behind `cloudflared`/`ngrok` for a public
+HTTPS URL and add it as a custom connector (bearer-token auth; OAuth caveat noted in
+[`mcp/README.md`](mcp/README.md)).
+
+Eight tools: `recall`, `pull`, `export`, `health`, `stale`, `graph` (read) and `capture`,
+`learn` (write). Full detail in [`mcp/README.md`](mcp/README.md).
+
 ## Vault conventions
 
 - **One concept per note.** Dense `[[wikilinks]]`. Keep prose hubs (`_MOC-*`) separate from facts.
@@ -143,8 +163,9 @@ and install.sh layouts.
 
 The **core is pure stdlib** — capture, recall, curation, and every skill command run with zero pip
 installs. Semantic recall (embedding-based note matching) is the one **opt-in** extra: run
-`/second-brain embed-setup` to build an isolated venv with `fastembed`. Without it, recall stays
-keyword-only and everything degrades cleanly.
+`bash ~/second-brain/skills/second-brain/scripts/embed-setup.sh` (or `/second-brain embed-setup`)
+to build an isolated venv with `fastembed`. Without it, recall stays keyword-only and everything
+degrades cleanly.
 
 ## Privacy
 

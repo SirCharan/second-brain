@@ -1,7 +1,11 @@
 /** Honest cross-app compatibility. Real names + status — no logo wall, no tiles. */
 export default function WorksWith() {
-  const now = [{ name: "Claude Code", note: "hooks, today" }];
-  const soon = ["Claude Desktop", "ChatGPT", "Cursor"];
+  const now = [
+    { name: "Claude Code", note: "hooks, today" },
+    { name: "Claude Desktop", note: "via MCP" },
+    { name: "Cursor", note: "via MCP" },
+  ];
+  const soon = [{ name: "ChatGPT", note: "next · remote" }];
 
   return (
     <section
@@ -26,23 +30,23 @@ export default function WorksWith() {
               </span>
             </span>
           ))}
-          {soon.map((n) => (
+          {soon.map((t) => (
             <span
-              key={n}
+              key={t.name}
               className="flex flex-wrap items-baseline gap-x-2 gap-y-1 font-display text-[clamp(1.5rem,3vw,2rem)] text-ink-dim"
             >
-              {n}
+              {t.name}
               <span className="font-sans text-xs font-normal tracking-normal text-ink-faint">
-                via MCP, soon
+                {t.note}
               </span>
             </span>
           ))}
         </div>
 
         <p className="mt-6 max-w-2xl text-[15px] leading-relaxed text-ink-dim">
-          The vault is plain files, so any model can read it now. Automatic capture and
-          recall land in the other apps through a small MCP server we&apos;re building
-          next.
+          The vault is plain files, so any model can read it now. Claude Desktop and
+          Cursor also capture and recall through a small MCP server today; ChatGPT is
+          next, over a remote server.
         </p>
       </div>
     </section>

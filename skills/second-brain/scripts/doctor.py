@@ -224,6 +224,35 @@ if os.path.exists(elog):
 else:
     chk("hook-errors.log", True, "none (clean)")
 
+# MCP server (report-only; never fail hard — MCP is optional)
+MCP_DIR = os.path.abspath(os.path.join(HOOKS, "..", "mcp"))
+_mcp_files = ["sb_core.py", "server_stdio.py", "server_http.py", "mcp-setup.py"]
+_mcp_missing = [f for f in _mcp_files if not os.path.isfile(os.path.join(MCP_DIR, f))]
+chk(
+    "MCP server files",
+    not _mcp_missing,
+    ("missing: " + ", ".join(_mcp_missing)) if _mcp_missing else (MCP_DIR),
+    warn=True,
+)
+_clients = {
+    "Claude Desktop": os.path.join(
+        HOME, "Library/Application Support/Claude/claude_desktop_config.json"
+    ),
+    "Cursor": os.path.join(HOME, ".cursor/mcp.json"),
+}
+for cname, cpath in _clients.items():
+    reg = False
+    try:
+        reg = "second-brain" in json.load(open(cpath)).get("mcpServers", {})
+    except Exception:
+        reg = False
+    chk(
+        f"MCP registered: {cname}",
+        reg,
+        cpath if reg else "not registered (run mcp/mcp-setup.py --write)",
+        warn=True,
+    )
+
 # report
 fails = [r for r in rows if r[0] == "FAIL"]
 warns = [r for r in rows if r[0] == "WARN"]
