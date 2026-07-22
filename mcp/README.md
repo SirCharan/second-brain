@@ -3,9 +3,13 @@
 Exposes the vault to other MCP clients — **Claude Desktop**, **Cursor** (local stdio),
 and **ChatGPT** (remote HTTP) — so they can recall and capture notes, not just Claude Code.
 
-Pure stdlib. No pip, no `mcp` package. One shared tool layer (`sb_core.py`) behind two
-transports: `server_stdio.py` (JSON-RPC over stdin/stdout) and `server_http.py`
-(the same JSON-RPC over HTTP POST).
+The core is pure stdlib — no pip, no `mcp` package. One shared tool layer (`sb_core.py`)
+behind three transports:
+- `server_stdio.py` — JSON-RPC over stdin/stdout (Claude Desktop + Cursor). Stdlib.
+- `server_http.py` — the same JSON-RPC over HTTP POST with a bearer token. Stdlib. A
+  generic/testing endpoint; **not** for ChatGPT (see below).
+- `server_http_sdk.py` — the ChatGPT endpoint: official `mcp` SDK, Streamable-HTTP,
+  read-only, no-auth. The one file that needs a pip install, isolated in a venv.
 
 ## The 8 tools
 
@@ -47,21 +51,37 @@ This writes a `second-brain` entry into
 
 Restart the client; the `second-brain` tools then appear.
 
-### ChatGPT (remote HTTP)
+### ChatGPT (remote, Streamable-HTTP, read-only, no-auth)
+
+ChatGPT is the one client that will not accept the stdlib `server_http.py`. It needs the
+official `mcp` SDK endpoint (`server_http_sdk.py`), which runs in an isolated venv:
 
 ```bash
-SECOND_BRAIN_MCP_TOKEN=<pick-one> python3 mcp/server_http.py        # :8765
-cloudflared tunnel --url http://localhost:8765                       # public HTTPS URL
+bash mcp/mcp-http-setup.sh     # one-time: build venv-mcp with `pip install mcp`
+bash mcp/run-chatgpt.sh        # start the read-only server + a cloudflared tunnel
 ```
 
-Add a custom connector in ChatGPT pointing at the tunnel URL, with
-`Authorization: Bearer <token>`. `GET /health` is a liveness probe.
+`run-chatgpt.sh` prints a public `https://…trycloudflare.com` URL. Then, in ChatGPT web
+on your account:
 
-## OAuth caveat (ChatGPT)
+1. **Settings → Connectors → Advanced → Developer mode → Create**
+2. Paste the tunnel URL. **Authentication: No authentication.**
+3. Save. The `second-brain` read tools (`recall`, `pull`, `export`, `health`, `stale`,
+   `graph`) appear. The write tools (`capture`, `learn`) are intentionally absent —
+   writes stay local via stdio.
 
-ChatGPT custom connectors generally expect a **public HTTPS URL and full OAuth 2.1**
-(with dynamic client registration). A static **bearer token may not satisfy** that flow —
-it is the interim auth here. If the connector rejects the bearer token, the documented
-fallback is to add the official `mcp` Python SDK in an isolated venv (mirroring
-`skills/second-brain/scripts/embed-setup.sh`) for that one endpoint. Claude Desktop and
-Cursor need none of this — they use the local stdio transport.
+Needs `cloudflared` (`brew install cloudflared`).
+
+## Auth: why ChatGPT is no-auth (not bearer)
+
+ChatGPT custom connectors accept **OAuth or no-authentication only — never a static
+bearer/API-key** — and expect a proper Streamable-HTTP handshake. So the stdlib
+`server_http.py` (bearer) is rejected by ChatGPT; use it only for local testing or a
+generic client. The ChatGPT path is `server_http_sdk.py`: read-only + no-auth behind a
+tunnel.
+
+**Anyone with the URL can read the vault.** Two mitigations: the endpoint exposes read
+tools only (no writes), and for real hardening put **Cloudflare Access** (or a named
+tunnel) in front of it instead of the ephemeral quick-tunnel URL.
+
+Claude Desktop and Cursor need none of this — they use the local stdio transport.

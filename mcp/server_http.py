@@ -42,7 +42,7 @@ def _rpc(req):
             "result": {
                 "protocolVersion": PROTOCOL,
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "second-brain", "version": "0.3.0"},
+                "serverInfo": {"name": "second-brain", "version": "0.4.0"},
             },
         }
     if method == "tools/list":
@@ -76,7 +76,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.rstrip("/") == "/health":
-            self._send(200, {"ok": True, "server": "second-brain", "version": "0.3.0"})
+            self._send(200, {"ok": True, "server": "second-brain", "version": "0.4.0"})
         else:
             self._send(404, {"error": "not found"})
 

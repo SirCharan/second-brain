@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Everything here is stdlib-only — no pip install. server_http_sdk.py is the
+      # one file that imports a non-stdlib package (`mcp`), so it is compiled/tested
+      # only under its venv (venv-mcp), never in CI.
+      - name: Compile (py_compile, stdlib files only)
+        run: |
+          python3 -m py_compile hooks/*.py skills/second-brain/scripts/*.py
+          for f in mcp/*.py; do
+            [ "$f" = "mcp/server_http_sdk.py" ] && continue
+            python3 -m py_compile "$f"
+          done
+
+      - name: Hook tests
+        run: |
+          for t in hooks/test_*.py; do
+            echo "== $t =="
+            python3 "$t"
+          done
+
+      - name: MCP test
+        run: python3 mcp/test_mcp.py

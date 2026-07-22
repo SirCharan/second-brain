@@ -311,6 +311,50 @@ fn install_plugin(
     }
 }
 
+// Optional: wire the second-brain MCP server into Claude Desktop + Cursor by running
+// `python3 mcp/mcp-setup.py --write` (idempotent; backs up each client config first).
+#[tauri::command]
+fn setup_mcp(app: AppHandle, vault_path: String) -> Result<String, String> {
+    let vault = vault_path.trim();
+    let repo = ensure_repo(&app)?;
+    let script = repo.join("mcp").join("mcp-setup.py");
+    emit_log(&app, format!("→ python3 {} --write", script.display()));
+
+    let mut child = Command::new("python3")
+        .env("PATH", augmented_path())
+        .env("CLAUDE_MEMORY_DIR", vault)
+        .env("HOME", home_dir())
+        .arg(&script)
+        .arg("--write")
+        .current_dir(&repo)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("failed to start mcp-setup.py: {e}"))?;
+
+    if let Some(out) = child.stdout.take() {
+        for line in BufReader::new(out).lines().flatten() {
+            emit_log(&app, line);
+        }
+    }
+    if let Some(err) = child.stderr.take() {
+        for line in BufReader::new(err).lines().flatten() {
+            emit_log(&app, line);
+        }
+    }
+
+    let status = child.wait().map_err(|e| e.to_string())?;
+    if status.success() {
+        emit_log(&app, "✓ MCP server wired into Claude Desktop + Cursor");
+        Ok("MCP configured. Restart Claude Desktop / Cursor to load the tools.".into())
+    } else {
+        Err(format!(
+            "mcp-setup.py exited with code {}",
+            status.code().unwrap_or(-1)
+        ))
+    }
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ObsidianResult {
@@ -443,6 +487,7 @@ pub fn run() {
             default_vault_path,
             install_plugin,
             install_obsidian,
+            setup_mcp,
             open_vault,
             open_url,
         ])

@@ -35,7 +35,7 @@ def handle(req):
             {
                 "protocolVersion": PROTOCOL,
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "second-brain", "version": "0.3.0"},
+                "serverInfo": {"name": "second-brain", "version": "0.4.0"},
             },
         )
     if method == "tools/list":

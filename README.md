@@ -123,9 +123,9 @@ See [`config.example.json`](config.example.json) for a worked example.
 
 ## MCP server
 
-An MCP server (`mcp/`) exposes the vault to **Claude Desktop** and **Cursor** (local stdio,
-shipping now) and **ChatGPT** (remote HTTP, next) — so recall and capture work outside Claude
-Code too. Pure stdlib; no pip, no `mcp` package.
+An MCP server (`mcp/`) exposes the vault to **Claude Desktop** + **Cursor** (local stdio)
+and **ChatGPT** (remote, read-only) — so recall and capture work outside Claude Code too.
+The core is pure stdlib; only the ChatGPT endpoint adds one pip package, isolated in a venv.
 
 Claude Desktop + Cursor:
 
@@ -134,9 +134,18 @@ python3 mcp/mcp-setup.py            # preview the config
 python3 mcp/mcp-setup.py --write    # merge into both client configs (backs up first), then restart
 ```
 
-ChatGPT (remote): run `python3 mcp/server_http.py` behind `cloudflared`/`ngrok` for a public
-HTTPS URL and add it as a custom connector (bearer-token auth; OAuth caveat noted in
-[`mcp/README.md`](mcp/README.md)).
+ChatGPT (remote): the read-only endpoint uses the official `mcp` SDK over Streamable-HTTP
+with **no authentication** (ChatGPT connectors accept OAuth or no-auth — **not** a bearer
+token), behind a cloudflared tunnel.
+
+```bash
+bash mcp/mcp-http-setup.sh          # one-time: build the venv (pip install mcp)
+bash mcp/run-chatgpt.sh             # start the server + tunnel, prints a public HTTPS URL
+```
+
+Then in ChatGPT: **Settings → Connectors → Advanced → Developer mode → Create**, paste the
+URL, Auth = No authentication. Only the read tools are exposed; writes stay local. Full
+steps + hardening (Cloudflare Access) in [`mcp/README.md`](mcp/README.md).
 
 Eight tools: `recall`, `pull`, `export`, `health`, `stale`, `graph` (read) and `capture`,
 `learn` (write). Full detail in [`mcp/README.md`](mcp/README.md).

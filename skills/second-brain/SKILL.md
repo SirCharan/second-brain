@@ -24,6 +24,7 @@ Dispatch on the argument after `/second-brain`:
 - **review** — weekly rollup: read recent `Daily/` + recently-`last_confirmed` notes; write a dated `## Review` block into today's Daily (what changed, open threads, promotion candidates).
 - **health** — run `scripts/health.py` and relay: counts, missing v2 fields, broken wikilinks, orphans, stale (>120d), retired.
 - **find `<query>`** — run `scripts/find.py <query>` (grep-based ranked search); relay top hits.
+- **dedup `[--threshold N] [--folder NAME]`** — run `scripts/dedup.py`; deterministic near-duplicate finder (title+description character-trigram Jaccard, boosted by shared tags). Prints merge candidates (oldest-first: merge the older note into the newer). Read-only — feeds `reconcile`/`prune`; never edits.
 - **prune** — run `health.py`; from stale/orphan/duplicate candidates, **propose** a table of archive/merge/retire actions for you to confirm. Apply only what's approved, via `status`/`supersedes` (move to an `_archive/` folder at most — never `rm`).
 - **migrate** — run `scripts/migrate-frontmatter.py` to backfill v2 fields on any notes missing them (idempotent).
 - **index** — run `scripts/build-system-index.py` to (re)generate the `_system/` folder (CLAUDE.md copy, one note per skill + per workflow, `_MOC-system`) and, if `config.json` has `project_meta`, `_projects.md` + per-MOC Links blocks. Refresh after adding skills/projects or editing CLAUDE.md.

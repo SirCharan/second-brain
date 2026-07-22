@@ -88,6 +88,7 @@ async function init() {
   const btnInstall = $<HTMLButtonElement>("btn-install");
   const btnObsidian = $<HTMLButtonElement>("btn-obsidian");
   const btnOpen = $<HTMLButtonElement>("btn-open");
+  const btnMcp = $<HTMLButtonElement>("btn-mcp");
   const prereqList = $<HTMLUListElement>("prereq-list");
   const done = $("done");
 
@@ -215,6 +216,10 @@ async function init() {
         btnOpen.disabled = false;
         btnOpen.dataset.locked = "0";
       }
+      if (btnMcp) {
+        btnMcp.disabled = false;
+        btnMcp.dataset.locked = "0";
+      }
       markStep("step-3", "active");
     } catch (err) {
       appendLog(`error: ${String(err)}`);
@@ -243,6 +248,26 @@ async function init() {
       setBusy(btnObsidian, false);
       if (btnObsidian && btnObsidian.textContent === "Working…") {
         btnObsidian.textContent = "Install";
+      }
+    }
+  });
+
+  btnMcp?.addEventListener("click", async () => {
+    const vault = vaultInput?.value.trim() || "";
+    setBusy(btnMcp, true, "Working…");
+    markStep("step-5", "active");
+    try {
+      const msg = await invoke<string>("setup_mcp", { vaultPath: vault });
+      showNote("mcp-note", msg);
+      markStep("step-5", "done");
+      if (btnMcp) btnMcp.textContent = "Done";
+    } catch (err) {
+      showNote("mcp-note", String(err));
+      if (btnMcp) btnMcp.textContent = "Retry";
+    } finally {
+      setBusy(btnMcp, false);
+      if (btnMcp && btnMcp.textContent === "Working…") {
+        btnMcp.textContent = "Set up";
       }
     }
   });
