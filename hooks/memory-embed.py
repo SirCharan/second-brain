@@ -11,9 +11,11 @@ CLI:
 The recall hook shells into `query` as a guarded, timed fallback. Everything degrades
 to a clean no-op if the model/deps are unavailable."""
 
-import os, re, sys, glob, sqlite3, struct
+import os, re, sys, glob, math, sqlite3, struct
 
-MEM = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.expanduser("~/.claude/second-brain-vault")
+MEM = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.expanduser(
+    "~/.claude/second-brain-vault"
+)
 DB = os.path.join(MEM, ".embed", "index.db")
 MODEL = "BAAI/bge-small-en-v1.5"
 EXCLUDE = {"MEMORY.md", "context.md", "_session-log.md"}
@@ -21,17 +23,17 @@ EXCLUDE = {"MEMORY.md", "context.md", "_session-log.md"}
 
 # ---------------------------------------------------------------- pure helpers
 def is_note(p):
-    """Mirror memory-recall's note filter: real curated notes only."""
-    b = os.path.basename(p)
-    if b in EXCLUDE or b.startswith("_"):
+    """Mirror memory-recall's note filter: real curated notes only, at any depth."""
+    rel = os.path.relpath(p, MEM)
+    parts = rel.split(os.sep)
+    b = parts[-1]
+    if b in EXCLUDE or b.startswith("_") or b.startswith("."):
         return False
-    if os.path.basename(os.path.dirname(p)) in (
-        "Daily",
-        "Weekly",
-        "_system",
-        "Sessions",
-    ):
-        return False
+    for d in parts[:-1]:
+        if d in ("Daily", "Weekly", "_system", "Sessions") or d.startswith("_backup"):
+            return False
+        if d.startswith(".") and d != "..":  # ".." appears for out-of-vault paths
+            return False
     return True
 
 
@@ -57,7 +59,16 @@ def unpack_vec(blob):
 
 
 def cosine(a, b):
-    import numpy as np
+    """Cosine similarity. Uses numpy when the embed venv is present, else pure stdlib —
+    the core must stay dependency-free (numpy only ships inside the optional venv)."""
+    try:
+        import numpy as np
+    except ImportError:
+        na = math.sqrt(sum(x * x for x in a))
+        nb = math.sqrt(sum(x * x for x in b))
+        if na == 0 or nb == 0:
+            return 0.0
+        return sum(x * y for x, y in zip(a, b)) / (na * nb)
 
     a, b = np.asarray(a, "f4"), np.asarray(b, "f4")
     na, nb = np.linalg.norm(a), np.linalg.norm(b)
@@ -93,7 +104,11 @@ def _embed(texts):
 def build():
     db = _connect()
     have = {r[0]: r[1] for r in db.execute("SELECT path, mtime FROM notes")}
-    on_disk = [p for p in glob.glob(os.path.join(MEM, "*", "*.md")) if is_note(p)]
+    on_disk = [
+        p
+        for p in glob.glob(os.path.join(MEM, "**", "*.md"), recursive=True)
+        if is_note(p)
+    ]
     disk_set = set(on_disk)
     # prune deleted
     for gone in set(have) - disk_set:
