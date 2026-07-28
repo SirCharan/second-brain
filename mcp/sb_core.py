@@ -174,7 +174,7 @@ def write_note(
 def _reindex():
     try:
         subprocess.run(
-            ["/usr/bin/python3", os.path.join(SCRIPTS, "regen-index.py"), "--write"],
+            [sys.executable, os.path.join(SCRIPTS, "regen-index.py"), "--write"],
             capture_output=True,
             timeout=30,
             env=_env(),
@@ -308,7 +308,7 @@ def _env():
 def _run(script, *args):
     try:
         r = subprocess.run(
-            ["/usr/bin/python3", os.path.join(SCRIPTS, script), *args],
+            [sys.executable, os.path.join(SCRIPTS, script), *args],
             capture_output=True,
             text=True,
             timeout=45,

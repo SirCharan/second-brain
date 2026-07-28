@@ -7,7 +7,11 @@ for Claude Desktop + Cursor stdio, and prints the ChatGPT (HTTP) instructions.
 
 Stdlib only. Idempotent: re-running just re-writes the same second-brain block."""
 
+import shutil
 import os, sys, json, shutil, time
+
+_PYTHON = (shutil.which("python3") or shutil.which("python")
+           or "/usr/bin/python3")  # absolute path: other apps run this, not us
 
 _THIS = os.path.dirname(os.path.abspath(__file__))
 SERVER = os.path.join(_THIS, "server_stdio.py")
@@ -26,7 +30,7 @@ CLIENTS = {
 }
 
 ENTRY = {
-    "command": "/usr/bin/python3",
+    "command": _PYTHON,  # resolved absolute interpreter (see below)
     "args": [SERVER],
     "env": {"CLAUDE_MEMORY_DIR": MEM},
 }

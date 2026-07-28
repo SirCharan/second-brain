@@ -5,6 +5,82 @@ on:
   pull_request:
 
 jobs:
+  # Runs the documented install into a throwaway HOME on both supported platforms,
+  # then gates on doctor. This is what makes "works on macOS and Linux" a fact rather
+  # than a claim — the install path had been broken for both before 0.5.0.
+  install-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install into a throwaway HOME
+        run: |
+          set -euo pipefail
+          FAKE="$RUNNER_TEMP/fakehome"
+          mkdir -p "$FAKE"
+          HOME="$FAKE" bash install.sh --no-setup
+          test -f "$FAKE/.claude/hooks/_hooklib.py"
+          test -d "$FAKE/.claude/skills/second-brain"
+          test -f "$FAKE/.claude/second-brain-vault/_Home.md"
+          test -f "$FAKE/.claude/second-brain-vault/_infra/_install-manifest.json"
+          # the test suite must not ship into the user's hooks dir
+          ! ls "$FAKE/.claude/hooks/" | grep -q '^test_'
+
+      - name: Doctor must pass on a fresh install
+        run: |
+          set -euo pipefail
+          FAKE="$RUNNER_TEMP/fakehome"
+          VAULT="$FAKE/.claude/second-brain-vault"
+          # the wizard is interactive; emulate its one required output
+          python3 - "$VAULT/config.json" <<'PY'
+          import json, sys
+          p = sys.argv[1]
+          c = json.load(open(p)); c.pop("_comment", None)
+          c["project_map"] = {"demo": "demo"}
+          json.dump(c, open(p, "w"), indent=2)
+          PY
+          HOME="$FAKE" CLAUDE_MEMORY_DIR="$VAULT" \
+            python3 "$FAKE/.claude/skills/second-brain/scripts/doctor.py" --strict
+
+      - name: Setup wizard must not hang without a TTY
+        run: |
+          set -euo pipefail
+          FAKE="$RUNNER_TEMP/fakehome"
+          VAULT="$FAKE/.claude/second-brain-vault"
+          timeout 30 env HOME="$FAKE" CLAUDE_MEMORY_DIR="$VAULT" \
+            python3 "$FAKE/.claude/skills/second-brain/scripts/setup.py" < /dev/null
+
+      - name: Virgin vault must be clean
+        run: |
+          set -euo pipefail
+          FAKE="$RUNNER_TEMP/fakehome"
+          VAULT="$FAKE/.claude/second-brain-vault"
+          out="$(CLAUDE_MEMORY_DIR="$VAULT" python3 skills/second-brain/scripts/health.py)"
+          echo "$out"
+          echo "$out" | grep -q "broken wikilinks: 0"
+          echo "$out" | grep -q "orphans (no outbound links): 0"
+
+      - name: Uninstall must leave the vault and restore settings
+        run: |
+          set -euo pipefail
+          FAKE="$RUNNER_TEMP/fakehome"
+          HOME="$FAKE" bash uninstall.sh
+          test ! -d "$FAKE/.claude/skills/second-brain"
+          test -f "$FAKE/.claude/second-brain-vault/_Home.md"   # notes survive
+          python3 - "$FAKE/.claude/settings.json" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          assert not d.get("hooks"), "hooks should be de-registered: %r" % (d.get("hooks"),)
+          print("settings.json clean")
+          PY
+
   test:
     runs-on: ubuntu-latest
     steps:

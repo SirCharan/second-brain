@@ -103,7 +103,7 @@ def demo():
     )
     env = dict(os.environ, CLAUDE_MEMORY_DIR=fmem)
     r = subprocess.run(
-        ["/usr/bin/python3", os.path.join(_THIS, "server_stdio.py")],
+        [sys.executable, os.path.join(_THIS, "server_stdio.py")],
         input=frames,
         capture_output=True,
         text=True,
