@@ -12,6 +12,24 @@ import os, re, sys, glob, time, subprocess
 
 # --- locate _hooklib (hooks dir) + the skill scripts, in either install mode ---
 _THIS = os.path.dirname(os.path.abspath(__file__))
+
+
+def _read_version():
+    """Single source of truth: the repo's VERSION file. Falls back to 'unknown' rather
+    than a hardcoded number that silently drifts (it had drifted 3 ways before)."""
+    for rel in ("..", ".", "../.."):
+        p = os.path.join(_THIS, rel, "VERSION")
+        try:
+            with open(p) as f:
+                v = f.read().strip()
+                if v:
+                    return v
+        except OSError:
+            continue
+    return "unknown"
+
+
+VERSION = _read_version()
 _ROOTS = [
     os.environ.get("CLAUDE_PLUGIN_ROOT"),
     os.path.join(_THIS, ".."),  # repo root: mcp/ -> ..
