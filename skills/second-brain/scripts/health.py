@@ -22,6 +22,10 @@ def _cfg():
 
 KNOWN = {"wikilink", "wikilinks"} | set(_cfg().get("ignore_names", []))
 STALE_DAYS = 120
+# Note-size discipline: atomic notes target <=4KB (one concept, injectable whole by
+# recall); >8KB is a hard split gate. MOC/index/_Home files are exempt (excluded below).
+SPLIT_TARGET = 4096
+SPLIT_GATE = 8192
 notes = [
     p
     for p in glob.glob(os.path.join(MEM, "**", "*.md"), recursive=True)
@@ -29,10 +33,12 @@ notes = [
     and "/Daily/" not in p
     and "/Weekly/" not in p
     and "/_system/" not in p
+    and "/Sessions/" not in p
+    and "/_backup" not in p
     and not os.path.basename(p).startswith("_")
 ]
-# link-target universe = EVERY note file (incl. _MOC-*/_index-*/_Home hubs), so links
-# to hubs don't read as broken. `notes` above stays the "real notes" set for the audit.
+# Link targets = EVERY .md in the vault (hubs/indexes start with "_" and are excluded
+# from the audited `notes` set above, but they are perfectly valid link targets).
 existing = {
     os.path.splitext(os.path.basename(p))[0]
     for p in glob.glob(os.path.join(MEM, "**", "*.md"), recursive=True)
@@ -44,8 +50,13 @@ def fm(p):
     b = {}
     if t.startswith("---\n"):
         e = t.find("\n---", 4)
-        for m in re.finditer(r"^([A-Za-z_]+):\s*(.*)$", t[4:e], re.M):
-            b[m.group(1)] = m.group(2).strip()
+        # Accept both shapes: top-level fields and the nested `metadata:` form a
+        # frontmatter normalizer produces. Top-level wins on conflict.
+        for m in re.finditer(r"^(\s*)([A-Za-z_]+):\s*(.*)$", t[4:e], re.M):
+            key, val, nested = m.group(2), m.group(3).strip(), bool(m.group(1))
+            if nested and key in b:
+                continue
+            b[key] = val
     return t, b
 
 
@@ -59,7 +70,8 @@ today = date.today()
 for p in notes:
     b = os.path.basename(p)
     name = os.path.splitext(b)[0]
-    folder = os.path.basename(os.path.dirname(p))
+    # top-level folder, so <proj>/subdir/x.md counts under <proj> (matches regen-index)
+    folder = os.path.relpath(p, MEM).split(os.sep)[0]
     by_folder[folder] = by_folder.get(folder, 0) + 1
     t, f = fm(p)
     for k in ("asserted", "last_confirmed", "source", "confidence", "status"):
@@ -67,6 +79,9 @@ for p in notes:
             miss_fields.append(f"{name} (missing {k})")
             break
     links = [x.strip() for x in re.findall(r"\[\[([^\]|#]+)", t)]
+    # Path-form links ([[folder/note]]) resolve on their last segment. Skip template
+    # placeholders and code fragments — they are not real link targets.
+    links = [l.split("/")[-1] for l in links if not re.search(r"[<>*\"',]", l)]
     bad = [l for l in links if l not in existing and l not in KNOWN]
     if bad:
         broken[name] = bad
@@ -92,4 +107,14 @@ print(
 )
 for a, n in sorted(stale, reverse=True)[:15]:
     print(f"  - {n} ({a}d)")
+oversized = sorted(
+    ((os.path.getsize(p), p) for p in notes if os.path.getsize(p) > SPLIT_GATE),
+    reverse=True,
+)
+print(
+    f"\noversized (>{SPLIT_GATE // 1024}KB hard gate; atomic target "
+    f"{SPLIT_TARGET // 1024}KB): {len(oversized)} — split and link, never append-forever"
+)
+for sz, p in oversized[:20]:
+    print(f"  - {os.path.relpath(p, MEM)} ({sz // 1024}KB)")
 print(f"\nretired (kept, not deleted): {len(retired)}")

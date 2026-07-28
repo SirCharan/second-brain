@@ -49,79 +49,11 @@ def main():
     branch = hook.get("gitBranch") or ""
     proj = os.path.basename(cwd.rstrip("/")) if cwd else ""
 
-    last_user = last_asst = None
-    files = []  # ordered-unique files edited/written
-    commands = []  # recent bash commands
-    errors = []  # error-ish tool_result snippets
-    for ln in HL.tail_lines(tpath, max_bytes=524288):
-        ln = ln.strip()
-        if not ln:
-            continue
-        try:
-            o = json.loads(ln)
-        except Exception:
-            continue
-        if o.get("isSidechain"):
-            continue
-        t = o.get("type")
-        msg = o.get("message") or {}
-        c = msg.get("content")
-        if t == "user":
-
-            def _real_prompt(s):
-                # ignore harness-injected messages, not genuine user turns
-                return s and not re.search(
-                    r"<task-notification>|SYSTEM NOTIFICATION|<system-reminder>", s
-                )
-
-            if isinstance(c, str) and _real_prompt(c.strip()):
-                last_user = c.strip()
-            elif isinstance(c, list):
-                for b in c:
-                    if not isinstance(b, dict):
-                        continue
-                    if b.get("type") == "text" and _real_prompt(
-                        b.get("text", "").strip()
-                    ):
-                        last_user = b["text"].strip()
-                    elif b.get("type") == "tool_result" and b.get("is_error"):
-                        # only the harness's own failure flag — reading a file that merely
-                        # contains the word "error" is not an unresolved error
-                        rc = b.get("content")
-                        txt = (
-                            rc
-                            if isinstance(rc, str)
-                            else (
-                                " ".join(
-                                    x.get("text", "") for x in rc if isinstance(x, dict)
-                                )
-                                if isinstance(rc, list)
-                                else ""
-                            )
-                        )
-                        s = re.sub(r"\s+", " ", txt).strip()
-                        if s:
-                            errors.append(s[:200])
-        elif t == "assistant" and isinstance(c, list):
-            texts = []
-            for b in c:
-                if not isinstance(b, dict):
-                    continue
-                if b.get("type") == "text" and b.get("text", "").strip():
-                    texts.append(b["text"].strip())
-                elif b.get("type") == "tool_use":
-                    name = b.get("name", "")
-                    inp = b.get("input") or {}
-                    if name in ("Edit", "Write", "NotebookEdit", "MultiEdit"):
-                        fp = inp.get("file_path") or inp.get("notebook_path")
-                        if fp and fp not in files:
-                            files.append(fp)
-                    elif name == "Bash":
-                        cmd = (inp.get("command") or "").strip()
-                        if cmd:
-                            commands.append(re.sub(r"\s+", " ", cmd)[:160])
-            if texts:
-                last_asst = "\n".join(texts)
+    # one shared parser (1MB tail): a single large tool result used to evict the
+    # user/assistant pair from a 512KB window, so the biggest turns captured nothing
+    scan = HL.scan_transcript(tpath, max_bytes=1_048_576)
+    last_user, last_asst = scan["last_user"], scan["last_asst"]
+    files, commands, errors = scan["files"], scan["commands"], scan["errors"]
 
     now = datetime.now()
     ctx = f"{proj}" + (f"@{branch}" if branch else "") if proj else "(no project)"

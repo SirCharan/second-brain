@@ -169,21 +169,31 @@ except Exception as e:
 notes = [
     p
     for p in glob.glob(os.path.join(MEM, "**", "*.md"), recursive=True)
+    # Same scope as health.py: journals, session logs, generated system notes and
+    # backups are not curated notes, so they never carry full v2 frontmatter.
     if os.path.basename(p) not in ("MEMORY.md", "context.md", "_session-log.md")
     and "/Daily/" not in p
     and "/Weekly/" not in p
+    and "/Sessions/" not in p
+    and "/_system/" not in p
+    and "/_backup" not in p
+    and not os.path.basename(p).startswith("_")
 ]
-drift = [
-    os.path.basename(p)
-    for p in notes
-    if "\nstatus:" not in open(p, errors="ignore").read()[:400]
-    and "\nstatus:" not in ""
-]
-drift = [
-    os.path.basename(p)
-    for p in notes
-    if not re.search(r"^status:", open(p, errors="ignore").read()[:400], re.M)
-]
+
+
+def _has_status(path):
+    """Parse the real frontmatter block — a fixed char window misses notes whose
+    description pushes `status:` further down."""
+    t = open(path, errors="ignore").read()
+    if not t.startswith("---\n"):
+        return False
+    end = t.find("\n---", 4)
+    # Accept both shapes: top-level `status:` and the nested `metadata:` form a
+    # frontmatter normalizer produces.
+    return bool(re.search(r"^\s*status:", t[4 : end if end > 0 else 4000], re.M))
+
+
+drift = [os.path.basename(p) for p in notes if not _has_status(p)]
 if drift and FIX:
     try:
         subprocess.run(
@@ -196,11 +206,7 @@ if drift and FIX:
             ],
             timeout=30,
         )
-        drift = [
-            os.path.basename(p)
-            for p in notes
-            if not re.search(r"^status:", open(p, errors="ignore").read()[:400], re.M)
-        ]
+        drift = [os.path.basename(p) for p in notes if not _has_status(p)]
     except Exception:
         pass
 chk(

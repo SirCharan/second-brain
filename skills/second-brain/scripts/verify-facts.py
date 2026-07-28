@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""Set-based fact-token verifier for vault restructures.
+
+Extracts fact tokens from every .md inside a backup tarball and checks each one still
+exists SOMEWHERE in the current vault. Facts legitimately move between notes during a
+split/merge, so this compares vault-wide sets, not per-file diffs.
+
+Fact tokens: URLs, UPPER_SNAKE flags, hex ids (7-40 chars), numbers with a unit
+(%/KB/MB/s/d/x/$), and bare numbers of 3+ digits.
+
+Usage: verify-facts.py <backup.tar.gz> [vault_dir]
+Exit 0 = no facts lost. Exit 1 = missing tokens (printed with their source note).
+"""
+
+import io
+import os
+import re
+import sys
+import glob
+import tarfile
+
+SKIP_SEGS = ("Daily", "Weekly", "Sessions", "_system")
+TOKEN_RE = re.compile(
+    r"https?://[^\s)\]>\"']+"  # URLs
+    r"|\b[A-Z][A-Z0-9_]{3,}\b"  # UPPER_SNAKE flags / env vars
+    r"|\b[0-9a-f]{7,40}\b"  # commit ids / hex
+    r"|\b\d+(?:\.\d+)?\s?(?:%|KB|MB|GB|ms|s|d|x|\$)"  # numbers with unit
+    r"|\b\d{3,}\b"  # bare numbers 3+ digits
+)
+
+
+def _skip(relpath):
+    parts = relpath.split("/")
+    if parts[-1].startswith("._"):  # macOS AppleDouble resource forks in tars
+        return True
+    return any(p in SKIP_SEGS or p.startswith(("_backup", ".")) for p in parts[:-1])
+
+
+def tokens(text):
+    return set(TOKEN_RE.findall(text))
+
+
+def backup_tokens(tar_path):
+    """token -> first source member that carried it."""
+    out = {}
+    with tarfile.open(tar_path) as tf:
+        for m in tf.getmembers():
+            if not m.name.endswith(".md") or _skip(m.name):
+                continue
+            f = tf.extractfile(m)
+            if not f:
+                continue
+            text = io.TextIOWrapper(f, errors="ignore").read()
+            for t in tokens(text):
+                out.setdefault(t, m.name)
+    return out
+
+
+def current_tokens(vault):
+    out = set()
+    for p in glob.glob(os.path.join(vault, "**", "*.md"), recursive=True):
+        rel = os.path.relpath(p, vault)
+        if any(seg.startswith(("_backup", ".")) for seg in rel.split(os.sep)[:-1]):
+            continue  # backups moved out don't count as "still present"
+        try:
+            out |= tokens(open(p, errors="ignore").read())
+        except Exception:
+            pass
+    return out
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(2)
+    tar_path = sys.argv[1]
+    vault = (
+        sys.argv[2]
+        if len(sys.argv) > 2
+        else (
+            os.environ.get("CLAUDE_MEMORY_DIR")
+            or os.path.expanduser("~/.claude/second-brain-vault")
+        )
+    )
+    bt = backup_tokens(tar_path)
+    ct = current_tokens(vault)
+    missing = sorted((t, src) for t, src in bt.items() if t not in ct)
+    print(
+        f"backup tokens: {len(bt)} · current tokens: {len(ct)} · missing: {len(missing)}"
+    )
+    for t, src in missing[:50]:
+        print(f"  MISSING {t!r}  (was in {src})")
+    if len(missing) > 50:
+        print(f"  ... and {len(missing) - 50} more")
+    sys.exit(1 if missing else 0)
+
+
+if __name__ == "__main__":
+    main()

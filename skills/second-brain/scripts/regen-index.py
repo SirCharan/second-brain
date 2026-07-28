@@ -33,6 +33,25 @@ FOLDERS = {k: tuple(v) for k, v in HL.CONFIG.get("domains", {}).items()}
 DOMAIN_ORDER = [tuple(x) for x in HL.CONFIG.get("domain_order", [])]
 
 
+def all_folders():
+    """FOLDERS (from config "domains") is a title/domain OVERRIDE map; every other
+    note-bearing top-level dir on disk still gets indexed under the default domain, so a
+    new project folder is never missed by the TOC."""
+    out = dict(FOLDERS)
+    for d in sorted(os.listdir(MEM)):
+        fp = os.path.join(MEM, d)
+        if (
+            not os.path.isdir(fp)
+            or d in RESERVED
+            or d.startswith(".")
+            or d.startswith("_backup")
+        ):
+            continue
+        if d not in out and glob.glob(os.path.join(fp, "**", "*.md"), recursive=True):
+            out[d] = (DEFAULT_DOMAIN[0], d)
+    return out
+
+
 def field(p, k):
     t = open(p, errors="ignore").read()[:800]
     m = re.search(rf"^{k}:\s*(.+)$", t, re.M)
@@ -56,16 +75,15 @@ def load_tails():
 
 def main():
     tails = load_tails()
+    folders_all = all_folders()
     sections = {}  # folder -> list of (last_confirmed, line)
-    for p in glob.glob(os.path.join(MEM, "*", "*.md")):
+    for p in glob.glob(os.path.join(MEM, "*", "**", "*.md"), recursive=True):
         b = os.path.splitext(os.path.basename(p))[0]
         if b.startswith("_"):
             continue
-        folder = os.path.basename(os.path.dirname(p))
-        if folder in RESERVED or folder.startswith("."):
+        folder = os.path.relpath(p, MEM).split(os.sep)[0]
+        if folder not in folders_all:
             continue
-        if folder not in FOLDERS:  # auto-discover folders not in config
-            FOLDERS[folder] = (DEFAULT_DOMAIN[0], folder)
         tail = tails.get(b) or (
             f" — {field(p, 'description')[:120]}" if field(p, "description") else ""
         )
@@ -74,7 +92,7 @@ def main():
 
     # --- per-folder shard files ---
     shard_files, total = [], 0
-    for folder, (domain, title) in FOLDERS.items():
+    for folder, (domain, title) in folders_all.items():
         rows = sections.get(folder)
         if not rows:
             continue
@@ -113,13 +131,17 @@ def main():
     # config order first, then any domain present but unlisted (incl. auto-discovered).
     order = list(DOMAIN_ORDER)
     known = {d for d, _ in order}
-    for d, _t in FOLDERS.values():
+    for d, _t in folders_all.values():
         if d not in known:
             order.append(DEFAULT_DOMAIN if d == DEFAULT_DOMAIN[0] else (d, d))
             known.add(d)
     for domain, dtitle in order:
+        # iterate folders_all, not the config override map — otherwise a new project
+        # folder gets an _index- shard that nothing in the TOC links to
         fs = [
-            (f, t) for f, (d, t) in FOLDERS.items() if d == domain and sections.get(f)
+            (f, t)
+            for f, (d, t) in folders_all.items()
+            if d == domain and sections.get(f)
         ]
         if not fs:
             continue
@@ -141,10 +163,15 @@ def main():
     for path, text in shard_files:
         HL.atomic_write(path, text)
     HL.atomic_write(mem_md, mem_txt)
+    # Every note-bearing folder gets a hub. Deterministic, so a project is never
+    # hub-less waiting on an LLM workflow. Uses the shared _hooklib template.
+    made = [f for f in folders_all if sections.get(f) and HL.ensure_project_scaffold(f)]
     print(
         f"WROTE {len(shard_files)} shards + thin MEMORY.md ({len(mem_txt.encode())} bytes, "
         f"{total} notes). backup: MEMORY.md.bak"
     )
+    if made:
+        print(f"bootstrapped {len(made)} missing hub(s): {', '.join(made)}")
 
 
 if __name__ == "__main__":

@@ -24,7 +24,21 @@ os.environ["CLAUDE_MEMORY_DIR"] = _VAULT
 
 HOOKS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HOOKS)
+import importlib
+
 import _hooklib as HL
+
+
+def _bind():
+    """Rebind _hooklib to this module's fixture vault. MEM/CONFIG freeze at import, so
+    under a combined pytest run another test module may have bound it to its own vault."""
+    global HL
+    os.environ["CLAUDE_MEMORY_DIR"] = _VAULT
+    HL = importlib.reload(HL)
+    return HL
+
+
+_bind()
 
 
 def _load(name, fname):
@@ -39,23 +53,27 @@ session_resume = _load("session_resume", "session-resume.py")
 
 
 def test_project_for_exact():
+    _bind()
     assert HL.project_for("/home/u/code/widgets") == "widgets"
     assert HL.project_for("/x/y/acme-web/") == "acme"
     assert HL.project_for("widgets") == "widgets"  # bare basename
 
 
 def test_project_for_prefix():
+    _bind()
     assert HL.project_for("/repos/corp-mcp-docs") == "corp"
     assert HL.project_for("/x/acme-anything") == "acme"
 
 
 def test_project_for_unknown():
+    _bind()
     assert HL.project_for("") is None
     assert HL.project_for(None) is None
     assert HL.project_for("/tmp/some-random-repo-xyz") is None
 
 
 def test_project_for_git_root_fallback():
+    _bind()
     """A subdir/worktree of a known repo resolves via git top-level basename."""
     base = tempfile.mkdtemp()
     repo = os.path.join(base, "widgets")  # basename is in the map
@@ -123,6 +141,7 @@ def test_session_resume_smoke_no_raw():
 
 
 def test_memory_recall_smoke():
+    _bind()
     rc, out, err = _run_hook(
         "memory-recall.py",
         {

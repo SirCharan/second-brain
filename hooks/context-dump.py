@@ -25,42 +25,11 @@ def newest_transcript():
 
 
 def extract(tpath):
-    last_user = None
-    files, commands, errors = [], [], []
-    for ln in HL.tail_lines(tpath, max_bytes=524288):
-        ln = ln.strip()
-        if not ln:
-            continue
-        try:
-            d = json.loads(ln)
-        except Exception:
-            continue
-        msg = d.get("message") or {}
-        role = msg.get("role")
-        content = msg.get("content")
-        text = ""
-        if isinstance(content, str):
-            text = content
-        elif isinstance(content, list):
-            for b in content:
-                if isinstance(b, dict):
-                    if b.get("type") == "text":
-                        text += b.get("text", "") + "\n"
-                    if b.get("type") == "tool_use":
-                        ti = b.get("input") or {}
-                        if b.get("name") in ("Edit", "Write") and ti.get("file_path"):
-                            fp = ti["file_path"]
-                            if fp not in files:
-                                files.append(fp)
-                        if b.get("name") == "Bash" and ti.get("command"):
-                            commands.append(ti["command"].strip().split("\n")[0][:120])
-        if role == "user" and isinstance(content, str) and not content.startswith("<"):
-            last_user = content.strip()[:400]
-        if "error" in text.lower() or "traceback" in text.lower():
-            m = re.search(r"(?im)^(.*(error|traceback|failed).*)$", text)
-            if m:
-                errors.append(m.group(1).strip()[:160])
-    return last_user, files[-12:], commands[-8:], errors[-4:]
+    """Shared parser: real user prompts, files, commands, and only harness-flagged
+    tool errors (the old text scan matched any file containing the word 'error')."""
+    scan = HL.scan_transcript(tpath, max_bytes=1_048_576)
+    last_user = (scan["last_user"] or "")[:400] or None
+    return last_user, scan["files"][-12:], scan["commands"][-8:], scan["errors"][-4:]
 
 
 def main():

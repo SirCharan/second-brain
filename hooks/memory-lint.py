@@ -43,6 +43,35 @@ def main():
     warns = []
     if not txt.startswith("---\n") or txt.find("\n---", 4) == -1:
         warns.append("no YAML frontmatter")
+    else:
+        # v2 shape. Accept BOTH the top-level and the nested `metadata:` form, since a
+        # frontmatter normalizer rewrites notes into the nested one.
+        fmb = txt[4 : txt.find("\n---", 4)]
+        need = (
+            "name",
+            "title",
+            "description",
+            "tags",
+            "asserted",
+            "last_confirmed",
+            "source",
+            "confidence",
+            "status",
+        )
+        gone = [k for k in need if not re.search(r"^\s*" + k + r":", fmb, re.M)]
+        if gone:
+            warns.append("missing v2 field(s): " + ", ".join(gone))
+        body = txt[txt.find("\n---", 4) + 4 :]
+        if not re.search(r"^# \S", body, re.M):
+            warns.append("no `# H1` title line")
+        elif not re.search(
+            r"[🟢🟡⚫🔴]", body[: body.find("\n##") if "\n##" in body else 600]
+        ):
+            warns.append(
+                "no emoji status chip (🟢 active / 🟡 watch / ⚫ retired / 🔴 real-money)"
+            )
+        if "## Related" not in body:
+            warns.append("no `## Related` section (link its `_MOC-` hub)")
     existing = {
         os.path.splitext(os.path.basename(p))[0]
         for p in glob.glob(os.path.join(MEM, "**", "*.md"), recursive=True)
@@ -57,6 +86,14 @@ def main():
         warns.append(
             "orphan note (no outbound [[links]] — link it to its _MOC or a hub)"
         )
+    # size gate: atomic notes target <=4KB; >8KB must be split (MOC/index/hub exempt)
+    if not b.startswith(("_MOC-", "_index-", "_Home")) and "/Sessions/" not in rp:
+        sz = os.path.getsize(rp)
+        if sz > 8192:
+            warns.append(
+                f"{sz // 1024}KB — over the 8KB split gate. Split into <=4KB atomic "
+                "notes under the project's _MOC hub; split and link, never append-forever"
+            )
 
     if warns:
         print(f"⚠️ memory-lint ({b}): " + "; ".join(warns))

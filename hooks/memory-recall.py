@@ -46,19 +46,36 @@ def _age_days(head):
     return None
 
 
+SKIP_DIRS = ("Daily", "Weekly", "_system", "Sessions")
+
+
 def _is_note(p):
-    """A real curated note — excludes index/meta files and the Daily/Weekly journals."""
-    b = os.path.basename(p)
-    if b in EXCLUDE or b.startswith("_"):
+    """A real curated note — excludes index/meta files, journals, backups and dot-dirs.
+    Works at ANY depth, so root-level notes and nested folders both count."""
+    rel = os.path.relpath(p, MEM)
+    parts = rel.split(os.sep)
+    b = parts[-1]
+    if b in EXCLUDE or b.startswith("_") or b.startswith("."):
         return False
-    if os.path.basename(os.path.dirname(p)) in (
-        "Daily",
-        "Weekly",
-        "_system",
-        "Sessions",
-    ):
-        return False
+    for d in parts[:-1]:
+        if d in SKIP_DIRS or d.startswith("_backup") or d.startswith("."):
+            return False
     return True
+
+
+def _all_notes():
+    """Every curated note in the vault, any depth (root-level included)."""
+    return [
+        p
+        for p in glob.glob(os.path.join(MEM, "**", "*.md"), recursive=True)
+        if _is_note(p)
+    ]
+
+
+def _folder(p):
+    """Top-level folder of a note ('' for vault root)."""
+    rel = os.path.relpath(p, MEM)
+    return rel.split(os.sep)[0] if os.sep in rel else ""
 
 
 def _latest_addition():
@@ -71,20 +88,63 @@ def _latest_addition():
             return re.sub(
                 r"^- \*\*\d{1,2}:\d{2}\*\*(\s*\[[^\]]*\])?\s*—\s*", "", lines[-1]
             )[:100]
-    notes = [p for p in glob.glob(os.path.join(MEM, "*", "*.md")) if _is_note(p)]
+    notes = _all_notes()
     if notes:
         return os.path.splitext(os.path.basename(max(notes, key=os.path.getmtime)))[0]
     return ""
 
 
+def _emit_note_debt():
+    """Surface unpaid curated-note debt, escalating with age and count. Written by the
+    capture-exchange Stop hook; clears itself when a note lands in the folder."""
+    try:
+        path = os.path.join(MEM, "_infra", "_note-debt.md")
+        if not os.path.exists(path):
+            return
+        rows = [
+            l.strip() for l in open(path, errors="ignore") if l.startswith("- [ ] ")
+        ]
+        if not rows:
+            return
+        projs, oldest = [], None
+        for r in rows:
+            # search PAST the "- [ ] " checkbox, or the regex matches "[ ]" not "[proj]"
+            m = re.search(r"\[([^\]\s]+)\]", r[6:])
+            if m and m.group(1) not in projs:
+                projs.append(m.group(1))
+            d = re.match(r"- \[ \] (\d{4}-\d{2}-\d{2})", r)
+            if d and (oldest is None or d.group(1) < oldest):
+                oldest = d.group(1)
+        age = 0
+        if oldest:
+            try:
+                age = int(
+                    (time.time() - time.mktime(time.strptime(oldest, "%Y-%m-%d")))
+                    / 86400
+                )
+            except Exception:
+                age = 0
+        lead = "⚠️ NOTE DEBT" if len(rows) < 3 and age < 2 else "\U0001f6a8 NOTE DEBT"
+        msg = (
+            f"{lead}: {len(rows)} session(s) changed code but left no curated note"
+            + (f" (oldest {age}d)" if age else "")
+            + f" — {', '.join(projs[:4])}. Write the note now in that project folder "
+            "(v2 frontmatter + H1 + status chip + callouts + `## Related` linking "
+            "its `_MOC-` hub), then it clears itself. See `_infra/_note-debt.md`."
+        )
+        sys.stdout.write(msg + "\n")
+    except Exception as e:
+        HL.log_err("memory-recall.note-debt", e)
+
+
 def _emit_stats(proj):
     """Print the always-on memory stats line: total notes, count on current topic, latest addition."""
     try:
-        notes = [p for p in glob.glob(os.path.join(MEM, "*", "*.md")) if _is_note(p)]
+        notes = _all_notes()
         total = len(notes)
         yclause = ""
         if proj:
-            yc = sum(1 for p in notes if os.path.basename(os.path.dirname(p)) == proj)
+            yc = sum(1 for p in notes if _folder(p) == proj)
             yclause = f" · {yc} on {proj}" if yc > 0 else f" · {proj} (new)"
         latest = _latest_addition()
         line = f"\U0001f4ca Obsidian memory: {total} notes{yclause}"
@@ -158,6 +218,7 @@ def main():
     sid = hook.get("session_id") or "nosession"
     proj = project_for(hook.get("cwd", ""))
     _emit_stats(proj)  # always-on memory stats line (before the gate)
+    _emit_note_debt()  # unpaid curated-note debt, if any
     if not prompt or TRIVIAL.match(prompt):
         return
     kw = {w for w in words(prompt) if w not in STOP}
@@ -165,13 +226,9 @@ def main():
         return
 
     rows = []
-    for p in glob.glob(os.path.join(MEM, "*", "*.md")):
+    for p in _all_notes():
         b = os.path.basename(p)
-        if b in EXCLUDE or b.startswith("_"):
-            continue
-        folder = os.path.basename(os.path.dirname(p))
-        if folder in ("Daily", "Weekly", "_system", "Sessions"):
-            continue
+        folder = _folder(p)
         name = os.path.splitext(b)[0]
         try:
             head = open(p, errors="ignore").read(
@@ -206,7 +263,7 @@ def main():
                 score = int(score * 0.6)
             elif age > 180:
                 score = int(score * 0.8)
-        rows.append((score, name, folder, desc[:110]))
+        rows.append((score, name, folder, desc[:110], p))
     rows.sort(reverse=True)
 
     os.makedirs(STATE_DIR, exist_ok=True)
@@ -218,19 +275,45 @@ def main():
     need = 4 - len(fresh)
     if need > 0:
         exclude = seen | {r[1] for r in fresh}
-        fresh += [(0, n, f, d) for (n, f, d) in _semantic_fill(prompt, exclude, need)]
+        fresh += [
+            (0, n, f, d, os.path.join(MEM, f, n + ".md"))
+            for (n, f, d) in _semantic_fill(prompt, exclude, need)
+        ]
     if not fresh:
         return
 
+    # Head-first injection: the TOP hit gets its full body (only when it respects the 8KB
+    # split gate — atomic notes are built to be injectable whole); every other hit gets
+    # its head (name + description + up to 3 key callout lines). Budget ~2k tokens.
+    BUDGET = 8000
+    SPLIT_GATE = 8192
     out = ["=== Relevant memory (auto-recalled for this prompt) ==="]
     total = len(out[0])
     picked = []
-    for s, name, folder, desc in fresh:
-        line = f"- [[{name}]] ({folder})" + (f" — {desc}" if desc else "")
-        if total + len(line) > 1400:
-            break
-        out.append(line)
-        total += len(line)
+    for i, (s, name, folder, desc, p) in enumerate(fresh):
+        block = f"- [[{name}]] ({folder or 'root'})" + (f" — {desc}" if desc else "")
+        extra = []
+        try:
+            if i == 0 and os.path.getsize(p) <= SPLIT_GATE:
+                body = open(p, errors="ignore").read()
+                body = re.sub(r"^---\n.*?\n---\n", "", body, count=1, flags=re.S)
+                extra = ["", body.strip(), ""]
+            else:
+                head = open(p, errors="ignore").read(2048)
+                extra = [
+                    "  " + l.strip()[:160]
+                    for l in head.splitlines()
+                    if l.strip().startswith("> [!")
+                ][:3]
+        except Exception:
+            pass
+        chunk = "\n".join([block] + extra) if extra else block
+        if total + len(chunk) > BUDGET:
+            chunk = block  # over budget: fall back to the one-line head
+            if total + len(chunk) > BUDGET:
+                break
+        out.append(chunk)
+        total += len(chunk)
         picked.append(name)
     if not picked:
         return

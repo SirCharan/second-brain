@@ -70,17 +70,35 @@ def main():
     # a short pure question is a lookup, not a build task
     if QUESTION.match(p) and words < 25 and "?" in p:
         return
-    if score(p) < 4:
+    s = score(p)
+    if s < 4:
         return
-    sys.stdout.write(
-        "=== Larger task detected — INTERVIEW FIRST ===\n"
-        "Before building, run an interactive discovery interview (this is ck's standing rule):\n"
-        "1. Use AskUserQuestion (2–4 questions, multiSelect where apt) across: scope (in/out) · "
-        "target env · output shape · tradeoffs (speed vs thoroughness / cost) · done-criteria. "
-        "Recommend a default in each option so it's a confirmation, not a blank.\n"
-        "2. Then TaskCreate a plan and execute step-by-step. Or run the /discovery skill to do all this.\n"
-        "Skip ONLY if ck already answered these this turn, it's a continuation, or it's genuinely trivial.\n"
+    out = [
+        "=== Larger task detected — INTERVIEW, THEN PLAN ===",
+        "Do these in order before writing code:",
+        "1. **Interview first** with AskUserQuestion (2–4 questions, multiSelect where apt) "
+        "across: scope (in/out) · target env · output shape · tradeoffs (speed vs "
+        "thoroughness / cost) · done-criteria. Recommend a default in every option so it "
+        "is a confirmation, not a blank. Do not start building on assumptions.",
+        "2. **Enter plan mode** to agree the shape before editing — explore read-only, then "
+        "present the plan for approval.",
+    ]
+    if s >= 7:
+        out.append(
+            "3. **This looks large: offer multi-agent orchestration** (the Workflow tool, "
+            "'ultracode') and let the user opt in. Fan out research and review across "
+            "agents; keep the main thread for synthesis."
+        )
+    else:
+        out.append(
+            "3. Then track the plan as tasks and execute step-by-step, marking each one "
+            "complete inline. For a big build, offer multi-agent orchestration."
+        )
+    out.append(
+        "Skip ONLY if the user already answered these this turn, it is a continuation, or "
+        "it is genuinely trivial."
     )
+    sys.stdout.write("\n".join(out) + "\n")
 
 
 if __name__ == "__main__":

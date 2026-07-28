@@ -76,21 +76,47 @@ def main():
     if fill < PCT:
         return
 
-    # nudge once per session (re-arms after /clear because the session id changes)
+    # Fire on each crossing; re-arm when context grows another 30% past the last dump
+    # (also re-arms after /clear, because the session id changes).
     try:
         os.makedirs(STATE_DIR, exist_ok=True)
         flag = os.path.join(STATE_DIR, sid)
+        prev = 0
         if os.path.exists(flag):
+            try:
+                prev = int(open(flag).read().strip() or 0)
+            except Exception:
+                prev = 0
+        if prev and tokens <= prev * 1.3:
             return
         open(flag, "w").write(str(tokens))
     except Exception:
         pass
 
+    # Auto-persist session state to the vault, detached so the prompt never waits.
+    # Compaction and /clear become non-events: the carryover digest is always current.
+    try:
+        import subprocess
+
+        dump = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "context-dump.py"
+        )
+        if os.path.exists(dump):
+            subprocess.Popen(
+                [sys.executable, dump, tpath],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+    except Exception as e:
+        if HL:
+            HL.log_err("context-monitor.dump", e)
+
     msg = (
-        f"\U0001f9e0 CONTEXT {fill:.0f}% full ({tokens:,}/{WINDOW:,} tokens). To cut cost: "
-        f"run `/second-brain dump` to save this session's state to the vault, then `/clear`. "
-        f"The next turns restart near-empty and session-resume reloads the digest. "
-        f"Skip only if you're about to finish."
+        f"\U0001f9e0 CONTEXT {fill:.0f}% full ({tokens:,}/{WINDOW:,} tokens). Session state "
+        f"auto-saved to the vault (`_infra/_carryover.md`) — `/clear` is safe anytime, and "
+        f"session-resume reloads the digest. For a richer hand-written snapshot first, run "
+        f"`/second-brain dump`."
     )
     sys.stdout.write(
         json.dumps(

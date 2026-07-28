@@ -10,17 +10,17 @@ _THIS = os.path.dirname(os.path.abspath(__file__))
 
 def _fixture_vault():
     d = tempfile.mkdtemp(prefix="sb-mcp-test-")
-    os.makedirs(os.path.join(d, "drishti"))
-    os.makedirs(os.path.join(d, "tatkaal"))
-    # a note that should win a "drishti signal cadence" query
-    open(os.path.join(d, "drishti", "drishti-cadence.md"), "w").write(
-        "---\nname: drishti-cadence\ndescription: Drishti signal cadence is a 5-minute cycle.\n"
+    os.makedirs(os.path.join(d, "widgets"))
+    os.makedirs(os.path.join(d, "acme"))
+    # a note that should win a "widgets release cadence" query
+    open(os.path.join(d, "widgets", "widgets-cadence.md"), "w").write(
+        "---\nname: widgets-cadence\ndescription: Widgets release cadence is a 5-minute cycle.\n"
         "last_confirmed: %s\nstatus: active\n---\n# Drishti cadence\n\nBody about signal cadence.\n"
         % _today()
     )
     # an unrelated note that should not win
-    open(os.path.join(d, "tatkaal", "tatkaal-assets.md"), "w").write(
-        "---\nname: tatkaal-assets\ndescription: Tatkaal covers three crypto assets.\n"
+    open(os.path.join(d, "acme", "acme-assets.md"), "w").write(
+        "---\nname: acme-assets\ndescription: Acme covers three regions.\n"
         "last_confirmed: 2020-01-01\nstatus: active\n---\n# Tatkaal assets\n\nBTC ETH PAXG.\n"
     )
     return d
@@ -77,9 +77,9 @@ def demo():
     # 2. rank() returns the relevant note first on a fixture vault
     fmem = _fixture_vault()
     C = load_core(fmem)
-    hits = C.rank("drishti signal cadence cycle", limit=3)
+    hits = C.rank("widgets release cadence cycle", limit=3)
     assert hits, "rank returned nothing"
-    assert hits[0]["name"] == "drishti-cadence", "wrong top hit: %r" % (hits[:1])
+    assert hits[0]["name"] == "widgets-cadence", "wrong top hit: %r" % (hits[:1])
 
     # 3. JSON-RPC handshake against server_stdio via subprocess pipe
     frames = (
@@ -94,7 +94,7 @@ def demo():
                     "method": "tools/call",
                     "params": {
                         "name": "recall",
-                        "arguments": {"query": "drishti signal cadence"},
+                        "arguments": {"query": "widgets release cadence"},
                     },
                 },
             ]
@@ -129,7 +129,7 @@ def demo():
         "graph",
     } <= names, "tools/list missing tools: %r" % names
     text = resps[2]["result"]["content"][0]["text"]
-    assert "drishti-cadence" in text, "recall tool did not surface the note: %r" % text
+    assert "widgets-cadence" in text, "recall tool did not surface the note: %r" % text
 
     if fails:
         print("FAIL:\n  " + "\n  ".join(fails))

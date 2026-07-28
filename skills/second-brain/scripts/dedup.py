@@ -182,16 +182,16 @@ def _selftest():
     open(os.path.join(d, "proj", "a.md"), "w").write(
         "---\nname: a\ntitle: Drishti signal cadence\n"
         "description: Drishti runs a five minute signal cadence cycle.\n"
-        "tags: [signals, project/drishti]\nlast_confirmed: 2026-01-01\nstatus: active\n---\n# A\n"
+        "tags: [signals, project/widgets]\nlast_confirmed: 2026-01-01\nstatus: active\n---\n# A\n"
     )
     open(os.path.join(d, "proj", "b.md"), "w").write(
         "---\nname: b\ntitle: Drishti signal cadence\n"
         "description: Drishti runs a 5 minute signal cadence cycle.\n"
-        "tags: [signals, project/drishti]\nlast_confirmed: 2026-06-01\nstatus: active\n---\n# B\n"
+        "tags: [signals, project/widgets]\nlast_confirmed: 2026-06-01\nstatus: active\n---\n# B\n"
     )
     open(os.path.join(d, "proj", "c.md"), "w").write(
         "---\nname: c\ntitle: Vercel deploy token\n"
-        "description: Ship ck-delta projects with vercel --prod from web dir.\n"
+        "description: Ship widgets projects with one deploy command from the web dir.\n"
         "tags: [tooling]\nlast_confirmed: 2026-03-01\nstatus: active\n---\n# C\n"
     )
     pairs = find_dups(d, threshold=0.55)

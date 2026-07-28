@@ -29,5 +29,10 @@ case "$source" in
       printf '\n%s\n' "=== end context.md ==="
     fi
     ;;
+  resume|compact)
+    # Don't re-inject the whole briefing (the conversation already carries it, and on
+    # compact it was just summarised) — but never leave the session blind to memory.
+    printf '%s\n' "🧠 Memory: vault at ${MEM_DIR} (index [[MEMORY]], hubs [[_MOC-*]], briefing [[context]]). Stuck or repeating a failure? Run \`/second-brain pull <terms>\` before guessing. Substantive work still needs a curated note."
+    ;;
 esac
 exit 0
