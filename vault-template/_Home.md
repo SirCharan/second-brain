@@ -15,9 +15,11 @@ Central map of the vault. Notes live in project folders; hubs are `_MOC-*`.
 > - Audit health: `/second-brain health`.
 
 ## Entry points
+- [[how-memory-works]] — the capture → recall → consolidate loop, and what each hook does
+- [[note-conventions]] — the exact shape a note takes
 - [[MEMORY]] — full index of notes
 - `Daily/` — auto-captured session journal
-- [[_MOC-example]] — example folder hub
+- [[_MOC-example]] — example folder hub (delete once you've read it)
 
 ## Maps of Content
 ### 🗂️ Notes

@@ -1,24 +1,11 @@
 {
-  "project_map": {
-    "my-app": "my-app",
-    "my-app-web": "my-app",
-    "landing-site": "marketing"
-  },
-  "project_prefixes": {
-    "acme-": "acme"
-  },
-  "domains": {
-    "my-app": ["product", "My App — the main product"],
-    "marketing": ["product", "Marketing site"],
-    "acme": ["work", "Acme client work"]
-  },
+  "_comment": "Written by `setup.py` (the install wizard). project_map routes a repo directory name to a vault folder; project_prefixes matches by prefix. Re-run the wizard any time: python3 ~/.claude/skills/second-brain/scripts/setup.py",
+  "project_map": {},
+  "project_prefixes": {},
+  "domains": {},
   "domain_order": [
-    ["product", "🚀 Product"],
-    ["work", "💼 Work"],
+    ["projects", "📁 Projects"],
     ["notes", "🗂️ Notes"]
   ],
-  "ignore_names": ["glossary", "roadmap"],
-  "project_meta": {
-    "my-app": ["you/my-app", "my-app.example.com", "~/code/my-app", "The main product"]
-  }
+  "ignore_names": []
 }
