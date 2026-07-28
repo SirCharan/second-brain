@@ -44,30 +44,63 @@ STATE_DIR = os.environ.get("SECOND_BRAIN_STATE_DIR") or os.path.join(
 # to that path to enable the symlink check/repair; leave unset to skip it.
 VAULT_LINK = os.environ.get("SECOND_BRAIN_OBSIDIAN_LINK", "")
 FIX = "--fix" in sys.argv
+STRICT = "--strict" in sys.argv  # exit non-zero on FAIL, so CI and installers can gate
+
+
+def _find_python():
+    """Any working Python 3.8+, not a hardcoded /usr/bin/python3. Pinning that path
+    made doctor FAIL on machines whose Python comes from Homebrew, nix, or a distro."""
+    import shutil
+
+    for c in (sys.executable, "python3", "/usr/bin/python3", "python"):
+        p = shutil.which(c) if c and not os.path.isabs(c) else c
+        if p and os.path.exists(p):
+            return p
+    return ""
+
+
+PY3 = _find_python()
 rows = []
 rows.append(
     (
         "PASS",
         "install mode",
         ("plugin" if IS_PLUGIN else "install.sh (~/.claude)") + f" · hooks: {HOOKS}",
+        "",
+        False,
     )
 )
 
 
-def chk(name, ok, detail="", warn=False):
+def chk(name, ok, detail="", warn=False, fix="", optional=False):
+    """Record a check. `fix` is the exact command that resolves it — a report that says
+    what is wrong without saying what to do is not an onboarding gate. `optional=True`
+    keeps a check out of the pass/fail headline (MCP is not part of the core promise)."""
     rows.append(
-        ("WARN" if (warn and not ok) else ("PASS" if ok else "FAIL"), name, detail)
+        (
+            "WARN" if (warn and not ok) else ("PASS" if ok else "FAIL"),
+            name,
+            detail,
+            fix,
+            optional,
+        )
     )
 
 
 # interpreter
 chk(
-    "system python3 (/usr/bin/python3)",
-    os.path.exists("/usr/bin/python3"),
-    "pinned interpreter for hooks",
+    "python3 available",
+    bool(PY3),
+    PY3 or "not found on PATH",
+    fix="macOS: xcode-select --install   ·   Debian: sudo apt install python3",
 )
 # vault dir
-chk("memory dir present", os.path.isdir(MEM), MEM)
+chk(
+    "memory dir present",
+    os.path.isdir(MEM),
+    MEM,
+    fix=f'mkdir -p "{MEM}"  (or re-run install.sh)',
+)
 # symlink (optional — only when SECOND_BRAIN_OBSIDIAN_LINK is set)
 if VAULT_LINK:
     link_ok = os.path.islink(VAULT_LINK) and os.path.realpath(
@@ -80,7 +113,7 @@ if VAULT_LINK:
             os.symlink(MEM, VAULT_LINK)
             link_ok = True
         except Exception as e:
-            rows.append(("FAIL", "symlink repair", repr(e)))
+            rows.append(("FAIL", "symlink repair", repr(e), "", False))
     chk("Obsidian vault symlink", link_ok, VAULT_LINK)
 # writable dirs
 for d in ("Daily", ".recall-state"):
@@ -91,7 +124,7 @@ for d in ("Daily", ".recall-state"):
         except Exception:
             pass
     ok = os.path.isdir(dp) and os.access(dp, os.W_OK)
-    chk(f"{d}/ writable", ok, dp, warn=True)
+    chk(f"{d}/ writable", ok, dp, warn=True, fix=f'mkdir -p "{dp}"')
 # hook files present + executable
 need = [
     "session-memory.sh",
@@ -110,6 +143,7 @@ chk(
     "hook files present",
     not missing,
     ("missing: " + ", ".join(missing)) if missing else f"{len(need)} files",
+    fix="re-run install.sh to restore the hooks",
 )
 nonexec = [
     h
@@ -122,6 +156,7 @@ chk(
     "hook wrappers executable",
     not nonexec,
     ("chmod needed: " + ", ".join(nonexec)) if nonexec else "ok",
+    fix=f'chmod +x "{HOOKS}"/*.sh',
 )
 # registration in settings.json
 try:
@@ -140,7 +175,11 @@ try:
         "memory-recall",
         "memory-lint",
     ]:
-        chk(f"registered: {want}", want in cmds)
+        chk(
+            f"registered: {want}",
+            want in cmds,
+            fix="re-run install.sh to register the hooks",
+        )
     ntimeout = sum(
         1
         for ev in H.values()
@@ -198,7 +237,7 @@ if drift and FIX:
     try:
         subprocess.run(
             [
-                "/usr/bin/python3",
+                PY3 or sys.executable,
                 os.path.join(
                     SK if (SK := os.path.dirname(__file__)) else ".",
                     "migrate-frontmatter.py",
@@ -212,9 +251,7 @@ if drift and FIX:
 chk(
     "frontmatter v2 coverage",
     not drift,
-    (f"{len(drift)} notes missing v2 (run migrate)")
-    if drift
-    else f"{len(notes)} notes ok",
+    (f"{len(drift)} notes missing v2") if drift else f"{len(notes)} notes ok",
     warn=True,
 )
 # error log tail
@@ -230,22 +267,61 @@ if os.path.exists(elog):
 else:
     chk("hook-errors.log", True, "none (clean)")
 
-# MCP server (report-only; never fail hard — MCP is optional)
+# --- vault content -----------------------------------------------------------
+# An empty vault is a valid install and a useless memory. Say so, rather than passing
+# silently and leaving the user wondering why recall never returns anything.
+_notes = []
+for _root, _dirs, _files in os.walk(MEM):
+    _rel = os.path.relpath(_root, MEM)
+    if any(
+        p in ("Daily", "Weekly", "Sessions", "_system")
+        or p.startswith((".", "_backup"))
+        for p in _rel.split(os.sep)
+    ):
+        continue
+    _notes += [f for f in _files if f.endswith(".md") and not f.startswith("_")]
+chk(
+    "vault has notes",
+    bool(_notes),
+    f"{len(_notes)} note(s)" if _notes else "no curated notes yet",
+    warn=True,
+    fix='start a Claude Code session and work normally, or: /second-brain capture "<fact>"',
+)
+
+# project routing — the single most common reason notes land in the wrong place
+_cfg_path = os.path.join(MEM, "config.json")
+try:
+    _pmap = (json.load(open(_cfg_path)) or {}).get("project_map") or {}
+except Exception:
+    _pmap = {}
+chk(
+    "project routing configured",
+    bool(_pmap),
+    f"{len(_pmap)} repo(s) mapped"
+    if _pmap
+    else "no project_map — notes will land in the vault root",
+    warn=True,
+    fix=f"python3 {os.path.join(_SCRIPTDIR, 'setup.py')}",
+)
+
+# --- MCP: optional, and kept out of the headline ------------------------------
 MCP_DIR = os.path.abspath(os.path.join(HOOKS, "..", "mcp"))
 _mcp_files = ["sb_core.py", "server_stdio.py", "server_http.py", "mcp-setup.py"]
 _mcp_missing = [f for f in _mcp_files if not os.path.isfile(os.path.join(MCP_DIR, f))]
 chk(
     "MCP server files",
     not _mcp_missing,
-    ("missing: " + ", ".join(_mcp_missing)) if _mcp_missing else (MCP_DIR),
+    "not installed" if _mcp_missing else MCP_DIR,
     warn=True,
+    optional=True,
+    fix="only needed to expose the vault to other apps; clone the repo and run mcp/mcp-setup.py --write",
 )
-_clients = {
-    "Claude Desktop": os.path.join(
+# Claude Desktop's config path is macOS-only; do not report a Linux box as misconfigured
+_clients = {"Cursor": os.path.join(HOME, ".cursor/mcp.json")}
+if sys.platform == "darwin":
+    _clients["Claude Desktop"] = os.path.join(
         HOME, "Library/Application Support/Claude/claude_desktop_config.json"
-    ),
-    "Cursor": os.path.join(HOME, ".cursor/mcp.json"),
-}
+    )
 for cname, cpath in _clients.items():
     reg = False
     try:
@@ -255,22 +331,44 @@ for cname, cpath in _clients.items():
     chk(
         f"MCP registered: {cname}",
         reg,
-        cpath if reg else "not registered (run mcp/mcp-setup.py --write)",
+        cpath if reg else "not registered",
         warn=True,
+        optional=True,
+        fix="python3 mcp/mcp-setup.py --write",
     )
 
-# report
-fails = [r for r in rows if r[0] == "FAIL"]
-warns = [r for r in rows if r[0] == "WARN"]
+# --- report -------------------------------------------------------------------
+core = [r for r in rows if not r[4]]
+opt = [r for r in rows if r[4]]
+fails = [r for r in core if r[0] == "FAIL"]
+warns = [r for r in core if r[0] == "WARN"]
+MARK = {"PASS": "✓", "WARN": "▲", "FAIL": "✗"}
+
 print("# /second-brain doctor" + ("  (--fix applied)" if FIX else ""))
-for st, name, detail in rows:
-    mark = {"PASS": "✓", "WARN": "▲", "FAIL": "✗"}[st]
-    print(f"  {mark} {name}" + (f" — {detail}" if detail else ""))
+for st, name, detail, _fix, _o in core:
+    print(f"  {MARK[st]} {name}" + (f" — {detail}" if detail else ""))
+if opt:
+    print("\n  optional (MCP — exposes the vault to other apps; not needed for memory)")
+    for st, name, detail, _fix, _o in opt:
+        print(
+            f"  {'✓' if st == 'PASS' else '·'} {name}"
+            + (f" — {detail}" if detail else "")
+        )
+
 print(
-    f"\n{len(rows) - len(fails) - len(warns)} pass · {len(warns)} warn · {len(fails)} fail"
-    + (
-        ""
-        if FIX or not (fails or warns)
-        else "   (run `/second-brain doctor --fix` to repair)"
-    )
+    f"\n{len(core) - len(fails) - len(warns)} pass · {len(warns)} warn · {len(fails)} fail"
 )
+
+# Ordered next actions: failures first, then warnings, each with the command to run.
+todo = [r for r in fails + warns if r[3]]
+if todo:
+    print("\nNext:")
+    for i, (_st, name, _d, fix, _o) in enumerate(todo, 1):
+        print(f"  {i}. {name}\n     {fix}")
+elif fails or warns:
+    print("\nNext:\n  1. run `/second-brain doctor --fix` to repair what it can")
+else:
+    print("\nAll good. Restart Claude Code if you just installed, then work normally.")
+
+if STRICT and fails:
+    sys.exit(1)
