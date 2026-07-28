@@ -54,7 +54,9 @@ jobs:
           set -euo pipefail
           FAKE="$RUNNER_TEMP/fakehome"
           VAULT="$FAKE/.claude/second-brain-vault"
-          timeout 30 env HOME="$FAKE" CLAUDE_MEMORY_DIR="$VAULT" \
+          # `timeout` is GNU coreutils and absent on macOS runners; perl ships on both.
+          HOME="$FAKE" CLAUDE_MEMORY_DIR="$VAULT" \
+            perl -e 'alarm 30; exec @ARGV or die "exec failed: $!"' -- \
             python3 "$FAKE/.claude/skills/second-brain/scripts/setup.py" < /dev/null
 
       - name: Virgin vault must be clean
