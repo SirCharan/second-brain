@@ -1,5 +1,10 @@
 # second-brain
 
+[![CI](https://github.com/SirCharan/second-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/SirCharan/second-brain/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.5.0-informational.svg)](CHANGELOG.md)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey.svg)](#requirements)
+
 A file-based **second brain for [Claude Code](https://claude.com/claude-code)**. Hooks quietly
 capture every session into an Obsidian-compatible Markdown vault, recall the relevant notes into
 new prompts, and snapshot state before the context window compacts — so Claude picks up where you
@@ -49,38 +54,68 @@ The capture journal (`Daily/`) is the firehose; **curated atomic notes** are the
 `/second-brain consolidate` turns the former into the latter. Notes are never auto-deleted — stale
 facts are retired via `status: retired` + `supersedes`, so the whole vault is git-auditable.
 
+## Requirements
+
+Claude Code, Python 3.8 or newer, and `bash`. macOS and Linux are tested in CI on every
+commit. Windows is not supported.
+
 ## Install
 
-### Option A — Claude Code plugin (recommended)
+```bash
+curl -fsSL https://raw.githubusercontent.com/SirCharan/second-brain/main/install.sh | bash
+```
+
+That copies the hooks, skill, and workflow into `~/.claude/`, creates your vault from
+`vault-template/`, registers the hooks in `~/.claude/settings.json`, and then runs a short
+setup wizard that finds your git repositories and writes the routing config.
+
+Restart Claude Code afterwards so the hooks load. Then just work normally — sessions are
+captured without you doing anything.
+
+**What it touches.** Five paths, all recorded in `$CLAUDE_MEMORY_DIR/_infra/_install-manifest.json`:
+`~/.claude/hooks/`, `~/.claude/skills/second-brain/`, `~/.claude/workflows/vault-enrich.js`,
+your vault, and `~/.claude/settings.json` (backed up to `settings.json.bak` first). Existing
+hooks and settings are merged, never replaced. Re-run it any time to upgrade.
+
+Prefer to read the script before running it? Clone and run it locally:
+
+```bash
+git clone https://github.com/SirCharan/second-brain && ./second-brain/install.sh
+```
+
+Useful flags: `--dry-run` (show what would happen), `--no-setup` (skip the wizard).
+
+### Verify
+
+```bash
+python3 ~/.claude/skills/second-brain/scripts/doctor.py
+```
+
+It reports what is configured and prints the exact command for anything that is not.
+
+### Uninstall
+
+```bash
+bash uninstall.sh                 # removes the machinery, keeps every note
+bash uninstall.sh --purge-vault   # also deletes the vault (asks first)
+```
+
+### Alternative: Claude Code plugin
 
 ```
 /plugin marketplace add SirCharan/second-brain
 /plugin install second-brain
 ```
 
-Then create your vault (the plugin ships the machinery, not your data):
+The plugin ships the machinery but not your vault, so create one and run the wizard:
 
 ```bash
 export CLAUDE_MEMORY_DIR="$HOME/.claude/second-brain-vault"   # add to your shell profile
-mkdir -p "$CLAUDE_MEMORY_DIR"
-# optional: seed it with the starter layout + config from this repo
-#   cp -R vault-template/. "$CLAUDE_MEMORY_DIR/"
+python3 ~/.claude/skills/second-brain/scripts/setup.py
 ```
 
-> The hooks no-op silently until `$CLAUDE_MEMORY_DIR` points at an existing directory, so nothing
-> breaks before you create the vault. Restart Claude Code after setting the variable.
-
-### Option B — install script (no plugin system)
-
-```bash
-git clone https://github.com/SirCharan/second-brain
-cd second-brain
-./install.sh
-```
-
-`install.sh` copies the hooks/skill/workflow into `~/.claude/`, creates the vault from
-`vault-template/`, seeds `config.json`, and merges the hook registrations into
-`~/.claude/settings.json` (backing it up first). It's idempotent — re-run it to upgrade.
+Pick one method. Running the plugin and the install script together registers every hook
+twice.
 
 ## Configuration
 
@@ -181,7 +216,7 @@ and install.sh layouts.
 
 The **core is pure stdlib** — capture, recall, curation, and every skill command run with zero pip
 installs. Semantic recall (embedding-based note matching) is the one **opt-in** extra: run
-`bash ~/second-brain/skills/second-brain/scripts/embed-setup.sh` (or `/second-brain embed-setup`)
+`bash ~/.claude/skills/second-brain/scripts/embed-setup.sh` (or `/second-brain embed-setup`, or say yes during setup)
 to build an isolated venv with `fastembed`. Without it, recall stays keyword-only and everything
 degrades cleanly.
 
