@@ -1,0 +1,58 @@
+{
+  "collapse-filter": false,
+  "search": "",
+  "showTags": true,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:_playbook",
+      "color": {
+        "a": 1,
+        "rgb": 14722136
+      }
+    },
+    {
+      "query": "path:_infra",
+      "color": {
+        "a": 1,
+        "rgb": 12674667
+      }
+    },
+    {
+      "query": "path:_system",
+      "color": {
+        "a": 1,
+        "rgb": 9141960
+      }
+    },
+    {
+      "query": "path:Daily",
+      "color": {
+        "a": 1,
+        "rgb": 7245746
+      }
+    },
+    {
+      "query": "path:Sessions",
+      "color": {
+        "a": 1,
+        "rgb": 8365696
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": false,
+  "textFadeMultiplier": -0.8,
+  "nodeSizeMultiplier": 1.2,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.42,
+  "repelStrength": 11,
+  "linkStrength": 1,
+  "linkDistance": 210,
+  "scale": 1,
+  "close": false
+}

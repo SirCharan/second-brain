@@ -1,0 +1,45 @@
+{
+  "_comment": "Tier -> skills shipped in starter-pack/skills. Single source of truth: starter-pack.py and the tests both read this file.",
+  "core": {
+    "what": "Process discipline and the vault-adjacent skills. Self-contained apart from the packs named in manifest.json.",
+    "skills": [
+      "gtan-workflow",
+      "discovery",
+      "working-with-claude",
+      "build-tdd",
+      "code-review-discipline"
+    ],
+    "workflows": [
+      "vault-restructure.js"
+    ]
+  },
+  "writing": {
+    "what": "Prose: route it, shape it, grade it before shipping.",
+    "skills": [
+      "writing-router",
+      "writing-composition",
+      "writing-eval",
+      "simplified-technical-english"
+    ],
+    "workflows": []
+  },
+  "design": {
+    "what": "Web UI: route it, build it against a token layer, audit it for AI slop before shipping.",
+    "skills": [
+      "design-router",
+      "design-system",
+      "anti-slop-design-law",
+      "anti-slop-design-audit",
+      "layout-interaction-design",
+      "motion-3d",
+      "dataviz-design",
+      "editorial-report-design",
+      "marketing-microsite-design",
+      "docs-design",
+      "tool-calculator-design",
+      "pro-max-search",
+      "design-build"
+    ],
+    "workflows": []
+  }
+}

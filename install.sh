@@ -7,7 +7,8 @@
 #   git clone https://github.com/SirCharan/second-brain && ./second-brain/install.sh
 #
 # Re-runnable: re-running upgrades files and de-dupes hook registrations.
-# Undo with uninstall.sh. Flags: --no-setup (skip the wizard), --dry-run.
+# Undo with uninstall.sh. Flags: --no-setup (skip the wizard), --dry-run,
+#   --pack=none|core|core,writing|all (answer the starter-pack question up front).
 set -euo pipefail
 
 REPO_URL="https://github.com/SirCharan/second-brain"
@@ -16,13 +17,17 @@ CLAUDE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 VAULT="${CLAUDE_MEMORY_DIR:-$HOME/.claude/second-brain-vault}"
 DRY_RUN=0
 RUN_SETUP=1
+PACK=""
 for a in "$@"; do
   case "$a" in
     --dry-run) DRY_RUN=1 ;;
     --no-setup) RUN_SETUP=0 ;;
-    -h|--help) sed -n '2,10p' "$0" 2>/dev/null || true; exit 0 ;;
+    --pack=*) PACK="${a#--pack=}" ;;
+    -h|--help) sed -n '2,11p' "$0" 2>/dev/null || true; exit 0 ;;
   esac
 done
+# "all" is the friendly spelling of every tier; starter-pack.py understands both.
+[ "$PACK" = "none" ] && PACK=""
 
 # --- locate the source tree -------------------------------------------------
 # Piped through curl there is no script file on disk: BASH_SOURCE is unset and $0 is
@@ -94,6 +99,11 @@ echo "second-brain $VERSION → installing into $CLAUDE"
 if [ "$DRY_RUN" = "1" ]; then
   echo "  (dry run) would copy hooks/, skills/second-brain/, workflows/vault-enrich.js"
   echo "  (dry run) would seed vault at $VAULT and register 9 hooks in $SETTINGS"
+  if [ -n "$PACK" ]; then
+    echo "  (dry run) would offer the starter pack: $PACK"
+  else
+    echo "  (dry run) would ask whether to install the starter pack (skills + vault notes)"
+  fi
   exit 0
 fi
 
@@ -196,10 +206,21 @@ if [ "$VAULT" != "$HOME/.claude/second-brain-vault" ]; then
 fi
 
 # --- guided setup -----------------------------------------------------------
+# SB_REPO lets setup.py/starter-pack.py find starter-pack/, which stays in the repo
+# rather than being copied into $CLAUDE. Under `curl | bash` the repo is a temp dir,
+# so this is the only handle they get.
+export SB_REPO="$REPO"
 SETUP="$CLAUDE/skills/second-brain/scripts/setup.py"
+PACK_SCRIPT="$CLAUDE/skills/second-brain/scripts/starter-pack.py"
 if [ "$RUN_SETUP" = "1" ] && [ -f "$SETUP" ]; then
   echo
-  CLAUDE_MEMORY_DIR="$VAULT" "$PY" "$SETUP" || echo "  ! setup skipped — re-run: $PY \"$SETUP\""
+  CLAUDE_MEMORY_DIR="$VAULT" "$PY" "$SETUP" ${PACK:+--pack "$PACK"} \
+    || echo "  ! setup skipped — re-run: $PY \"$SETUP\""
+elif [ -n "$PACK" ] && [ -f "$PACK_SCRIPT" ]; then
+  # --no-setup with an explicit --pack: install the pack, skip the wizard.
+  echo
+  CLAUDE_MEMORY_DIR="$VAULT" "$PY" "$PACK_SCRIPT" --tiers "$PACK" \
+    || echo "  ! starter pack skipped — re-run: $PY \"$PACK_SCRIPT\" --tiers $PACK"
 fi
 
 cat <<EOF
@@ -207,6 +228,7 @@ cat <<EOF
 second-brain $VERSION installed.
   Vault:  $VAULT
   Check:  $PY "$CLAUDE/skills/second-brain/scripts/doctor.py"
+  Pack:   $PY "$PACK_SCRIPT" --list      # optional skills + vault notes
   Undo:   bash uninstall.sh
 
 Restart Claude Code (or start a new session) so the hooks load.

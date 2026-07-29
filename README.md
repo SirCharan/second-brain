@@ -75,7 +75,9 @@ captured without you doing anything.
 **What it touches.** Five paths, all recorded in `$CLAUDE_MEMORY_DIR/_infra/_install-manifest.json`:
 `~/.claude/hooks/`, `~/.claude/skills/second-brain/`, `~/.claude/workflows/vault-enrich.js`,
 your vault, and `~/.claude/settings.json` (backed up to `settings.json.bak` first). Existing
-hooks and settings are merged, never replaced. Re-run it any time to upgrade.
+hooks and settings are merged, never replaced. Re-run it any time to upgrade. Accepting the
+optional starter pack below adds skill directories under `~/.claude/skills/`, which are recorded
+in the same manifest.
 
 Prefer to read the script before running it? Clone and run it locally:
 
@@ -83,7 +85,38 @@ Prefer to read the script before running it? Clone and run it locally:
 git clone https://github.com/SirCharan/second-brain && ./second-brain/install.sh
 ```
 
-Useful flags: `--dry-run` (show what would happen), `--no-setup` (skip the wizard).
+Useful flags: `--dry-run` (show what would happen), `--no-setup` (skip the wizard),
+`--pack=core|core,writing|all|none` (answer the starter-pack question up front).
+
+### Starter pack (optional)
+
+A new vault is nearly empty, so the graph — the reason to open it in Obsidian at all — has
+about six nodes on day one. The wizard offers a starter pack to fix that. Say no and nothing
+changes; the pack is not required for memory to work.
+
+| Tier | What you get |
+|---|---|
+| `core` | `gtan-workflow` (Garry Tan's GStack loop, bound to plans in your vault), `discovery` (interview before building), `working-with-claude`, `build-tdd`, `code-review-discipline`, plus the `vault-restructure` workflow |
+| `writing` | `writing-router`, `writing-composition`, `writing-eval`, `simplified-technical-english` |
+| `design` | `design-router`, `design-system`, `anti-slop-design-law`, `anti-slop-design-audit`, `layout-interaction-design`, `motion-3d`, `dataviz-design`, and the per-type recipes for reports, landing pages, docs sites and calculators |
+
+It also seeds a `_playbook/` folder with the working rules those skills assume, two note
+templates, and an `.obsidian/` config with graph colour groups per folder and a dark theme —
+core Obsidian features only, no community plugins.
+
+```bash
+python3 ~/.claude/skills/second-brain/scripts/starter-pack.py --list          # see everything first
+python3 ~/.claude/skills/second-brain/scripts/starter-pack.py --tiers core    # install one tier
+```
+
+**Nothing is overwritten.** A skill directory, vault note or `.obsidian/` you already have is
+left exactly as it is, so the script is safe to re-run. Installed paths are recorded in the
+install manifest, so `uninstall.sh` removes them too.
+
+**Third-party packs are not redistributed.** Several of these skills route into work by other
+people — GStack, superpowers, ui-ux-pro-max, stop-slop and others. `starter-pack/manifest.json`
+lists each with its author, licence and install command, and the installer prints that list
+rather than vendoring anyone's code into this repo.
 
 ### Verify
 

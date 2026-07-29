@@ -34,10 +34,13 @@ except Exception:
     )
     CONFIG = {}
 HOME = os.path.expanduser("~")
-SKILLS_DIR = os.path.join(HOME, ".claude/skills")
-CMDS_DIR = os.path.join(HOME, ".claude/commands")
-HOOKS_DIR = os.path.join(HOME, ".claude/hooks")
-CLAUDE_MD = os.path.join(HOME, ".claude/CLAUDE.md")
+# Honour CLAUDE_CONFIG_DIR like the rest of the codebase: a non-default config dir
+# otherwise indexes the wrong machine's skills (or none at all).
+CLAUDE_DIR = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(HOME, ".claude")
+SKILLS_DIR = os.path.join(CLAUDE_DIR, "skills")
+CMDS_DIR = os.path.join(CLAUDE_DIR, "commands")
+HOOKS_DIR = os.path.join(CLAUDE_DIR, "hooks")
+CLAUDE_MD = os.path.join(CLAUDE_DIR, "CLAUDE.md")
 SYS = os.path.join(MEM, "_system")
 
 
@@ -60,7 +63,9 @@ if os.path.exists(CLAUDE_MD):
     body = open(CLAUDE_MD, errors="ignore").read()
     w(
         os.path.join(SYS, "CLAUDE.md"),
-        "---\nname: CLAUDE\ntags: [meta, type/system]\n---\n\n> Live copy of `~/.claude/CLAUDE.md` — refreshed by `/second-brain index`. ↩ [[_MOC-system]]\n\n"
+        "---\nname: CLAUDE\ntags: [meta, type/system]\n---\n\n> Live copy of `"
+        + CLAUDE_MD
+        + "` — refreshed by `/second-brain index`. ↩ [[_MOC-system]]\n\n"
         + body,
     )
 
@@ -78,7 +83,7 @@ for s in skills:
     desc = fm_desc(os.path.join(SKILLS_DIR, s, "SKILL.md"))
     w(
         os.path.join(SYS, "skills", f"skill-{s}.md"),
-        f"---\nname: skill-{s}\ntags: [meta, type/skill]\n---\n\n# 🧩 {s}\n\n{desc}\n\n`~/.claude/skills/{s}/SKILL.md` · ↩ [[_MOC-system]]\n",
+        f"---\nname: skill-{s}\ntags: [meta, type/skill]\n---\n\n# 🧩 {s}\n\n{desc}\n\n`{os.path.join(SKILLS_DIR, s, 'SKILL.md')}` · ↩ [[_MOC-system]]\n",
     )
 
 # ---------- workflows: hooks + commands + the memory loop ----------
@@ -117,7 +122,7 @@ for name, (ev, what) in HOOK_WHAT.items():
     ):
         w(
             os.path.join(SYS, "workflows", f"wf-{name}.md"),
-            f"---\nname: wf-{name}\ntags: [meta, type/workflow]\n---\n\n# ⚙ {name}\n\n**Event:** {ev}  \n**Does:** {what}\n\n`~/.claude/hooks/{name}` · ↩ [[_MOC-system]] · [[memory-loop]]\n",
+            f"---\nname: wf-{name}\ntags: [meta, type/workflow]\n---\n\n# ⚙ {name}\n\n**Event:** {ev}  \n**Does:** {what}\n\n`{os.path.join(HOOKS_DIR, name)}` · ↩ [[_MOC-system]] · [[memory-loop]]\n",
         )
 cmds = (
     sorted(f[:-3] for f in os.listdir(CMDS_DIR) if f.endswith(".md"))
@@ -128,7 +133,7 @@ for c in cmds:
     desc = fm_desc(os.path.join(CMDS_DIR, c + ".md")) or "slash command"
     w(
         os.path.join(SYS, "workflows", f"cmd-{c}.md"),
-        f"---\nname: cmd-{c}\ntags: [meta, type/workflow]\n---\n\n# ⌘ /{c}\n\n{desc}\n\n`~/.claude/commands/{c}.md` · ↩ [[_MOC-system]]\n",
+        f"---\nname: cmd-{c}\ntags: [meta, type/workflow]\n---\n\n# ⌘ /{c}\n\n{desc}\n\n`{os.path.join(CMDS_DIR, c + '.md')}` · ↩ [[_MOC-system]]\n",
     )
 # memory-loop overview
 w(

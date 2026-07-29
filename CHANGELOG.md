@@ -2,6 +2,31 @@
 
 Notable changes per release. The current version lives in [`VERSION`](VERSION).
 
+## 0.6.0
+
+### Starter pack (opt-in)
+
+A fresh vault held six notes and no Obsidian configuration, so the graph looked dead on the
+day you installed it, and none of the working discipline the skill ecosystem assumes came
+with it.
+
+- `starter-pack/` ships 22 skills across three tiers (`core`, `writing`, `design`), a
+  `_playbook/` folder of working rules, two note templates, and an `.obsidian/` config with
+  per-folder graph colour groups. Core Obsidian features only — no community plugins.
+- Offered as step 3 of the setup wizard, and available any time via
+  `scripts/starter-pack.py --list` / `--tiers core,writing`. `install.sh --pack=…` answers the
+  question up front for a non-interactive install.
+- Nothing is overwritten. An existing skill directory, vault note or `.obsidian/` is left
+  exactly as it is, which makes the script safe to re-run.
+- Installed paths are appended to the install manifest, so `uninstall.sh` removes them with
+  no change on its side.
+- Third-party packs are referenced, never redistributed: `starter-pack/manifest.json` records
+  each one's author, licence, install command and which bundled skill needs it. Every source
+  was checked against a live upstream; one skill whose upstream could not be verified is
+  listed as unbundled rather than shipped with a guessed URL.
+- `build-system-index.py` now honours `CLAUDE_CONFIG_DIR`, so it indexes the right skills
+  directory and writes real paths into the `_system/` notes.
+
 ## 0.5.0
 
 ### Install and setup
