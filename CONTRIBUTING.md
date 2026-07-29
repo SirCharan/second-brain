@@ -54,7 +54,23 @@ python3 -m pytest hooks -q          # all together
 ```
 
 Vault-dependent tests must call `_bind()` first. `MEM` and `CONFIG` freeze at import, so
-without it a combined run binds to whichever module imported last.
+without it a combined run binds to whichever module imported last. Build fixtures at import
+too, not from a `setup()` under `__main__` — pytest calls the test functions directly and
+would otherwise run them against an empty vault.
+
+## Changing how recall ranks
+
+Retrieval has a measurement now, so guesses are no longer necessary:
+
+```bash
+python3 tests/eval/build_set.py -o ~/.second-brain/eval/queries.jsonl
+python3 tests/eval/run_eval.py  ~/.second-brain/eval/queries.jsonl --save before.json
+# make your change
+python3 tests/eval/run_eval.py  ~/.second-brain/eval/queries.jsonl --compare before.json --gate
+```
+
+Quote the hit@4 delta in the pull request. See `tests/eval/README.md` for the baseline and
+for what has already been measured and ruled out.
 
 ## Pull requests
 

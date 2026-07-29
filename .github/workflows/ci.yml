@@ -115,6 +115,50 @@ jobs:
       - name: dedup self-test
         run: python3 skills/second-brain/scripts/dedup.py --selftest
 
+      # The eval harness is the only thing that can tell whether a ranking change helped.
+      # It runs against the user's own vault, so CI cannot check a real score — it checks
+      # that the miner and the scorer still work end to end on a synthetic vault.
+      - name: Recall eval harness round-trip
+        run: |
+          set -euo pipefail
+          export CLAUDE_MEMORY_DIR="$RUNNER_TEMP/eval-vault"
+          export SECOND_BRAIN_STATE_DIR="$RUNNER_TEMP/eval-state"
+          mkdir -p "$CLAUDE_MEMORY_DIR/Daily" "$CLAUDE_MEMORY_DIR/widgets"
+          for n in cache-tuning retry-backoff schema-migration; do
+            cat > "$CLAUDE_MEMORY_DIR/widgets/$n.md" <<EOF
+          ---
+          name: $n
+          description: notes about $n in the widgets service
+          asserted: 2026-01-01
+          last_confirmed: 2026-01-01
+          status: active
+          ---
+          # $n
+          🟢 **active**
+          EOF
+          done
+          cat > "$CLAUDE_MEMORY_DIR/Daily/2026-01-02.md" <<'EOF'
+          # Daily
+          - **10:00** [widgets] — (win) Tuned the widgets cache and measured the hit rate || links: [[cache-tuning]]
+          - **11:00** [widgets] — (fix) Added retry backoff to the widgets client || links: [[retry-backoff]]
+          - **12:00** [widgets] — (raw) [Image: source: /tmp/x.png]
+          - **13:00** [widgets] — (decision) Planned the widgets schema migration rollout || links: [[schema-migration]]
+          EOF
+          python3 tests/eval/build_set.py -o "$RUNNER_TEMP/q.jsonl"
+          test "$(wc -l < "$RUNNER_TEMP/q.jsonl")" -eq 3   # the (raw) line must be skipped
+          out="$(python3 tests/eval/run_eval.py "$RUNNER_TEMP/q.jsonl" --save "$RUNNER_TEMP/base.json")"
+          echo "$out"
+          echo "$out" | grep -q 'hit@4 1.000'   # an exact-word fixture must score perfectly
+          # --gate must fail a regression rather than pass it silently
+          python3 - "$RUNNER_TEMP/base.json" <<'PY'
+          import json, sys
+          p = sys.argv[1]; d = json.load(open(p))
+          d["hit@4"] = 1.0; d["mrr"] = 1.0
+          json.dump(d, open(p, "w"))
+          PY
+          python3 tests/eval/run_eval.py "$RUNNER_TEMP/q.jsonl" --head-gate 99 \
+            --compare "$RUNNER_TEMP/base.json" --gate && { echo "gate failed to catch a regression"; exit 1; } || true
+
       - name: Exercise scripts against a fixture vault
         run: |
           set -e

@@ -1,5 +1,11 @@
 # the vault is the USER's data — never commit a real one
 second-brain-vault/
+
+# a mined eval set is the user's own prose, lifted out of their capture journal.
+# Commit the miner (tests/eval/build_set.py), never its output.
+tests/eval/*.jsonl
+tests/eval/*baseline*.json
+!tests/eval/queries.example.jsonl
 *.bak
 __pycache__/
 *.pyc

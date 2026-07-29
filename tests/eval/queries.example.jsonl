@@ -1,0 +1,3 @@
+{"q": "Tuned the widgets cache and measured the hit rate", "expect": ["cache-tuning"], "project": "widgets", "day": "2026-01-02"}
+{"q": "Added retry backoff to the widgets client", "expect": ["retry-backoff"], "project": "widgets", "day": "2026-01-02"}
+{"q": "Planned the widgets schema migration rollout", "expect": ["schema-migration", "widgets-releases"], "project": "widgets", "day": "2026-01-03"}
