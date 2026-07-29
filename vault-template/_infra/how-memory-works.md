@@ -39,7 +39,10 @@ The **journal** (`Daily/`, `Sessions/`) is automatic and complete. It records ev
 **Curated notes** are the durable layer: one concept each, written deliberately, linked into a hub. Recall ranks these, not the journal. A fact only becomes reliably retrievable once it lives in a curated note.
 
 > [!tip] Turning journal into knowledge
-> `/second-brain consolidate` reads recent journal entries and distills them into curated notes. Run it when the journal has built up, or let the weekly job do it.
+> `/second-brain consolidate` reads recent journal entries and distills them into curated notes. Nothing runs it for you: no scheduled job ships with this. The session-start hook counts your curation backlog and tells you when it has built up, and `_infra/_promote-queue.md` lists every research finding still waiting for a note.
+
+> [!warning] Skip it for long enough and recall goes quiet
+> `Daily/` and `Sessions/` grow forever and recall deliberately ignores both — it ranks curated notes only. A vault that is never consolidated keeps capturing perfectly and retrieves nothing, while still reporting a healthy note count.
 
 ## Keep notes small
 

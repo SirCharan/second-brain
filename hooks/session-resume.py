@@ -11,6 +11,50 @@ MEM = HL.MEM
 DAILY = os.path.join(MEM, "Daily")
 EXCLUDE = {"MEMORY.md", "context.md", "_session-log.md", "_Home.md"}
 
+# Character budgets. Sharding MEMORY.md stopped the index itself from overflowing, but
+# the overflow moved here: this hook pasted a whole project shard and the whole _Home
+# map in verbatim. Measured on a 489-note vault, the largest project injected 25,692
+# chars (~6,400 tokens) at every session start, 72% of it one uncapped shard, growing
+# with every note added to that project. Anything omitted is still one prompt away via
+# recall, so a cap costs reachability nothing.
+SHARD_MAX = 6000  # project note index (the section that actually overflowed)
+HOME_MAX = 2000  # _Home.md map
+TOTAL_MAX = 14000  # backstop across every section (~3,500 tokens)
+
+
+def _cap(text, limit, what):
+    """Trim text to `limit` chars on a line boundary, appending a pointer when cut."""
+    if len(text) <= limit:
+        return text
+    keep = text[:limit].rsplit("\n", 1)[0]
+    dropped = text[len(keep) :].count("\n")
+    return keep + "\n  … %d more %s omitted — recall surfaces them on demand." % (
+        dropped,
+        what,
+    )
+
+
+def _cap_index(lines, limit):
+    """Fit a project's note index into `limit` chars, preferring COVERAGE over detail:
+    descriptions if they fit, otherwise bare links for every note. Truncating the list
+    instead would hide notes alphabetically, and a note the model never learns exists is
+    one it never asks for — whereas a missing description is one recall away."""
+    full = "\n".join(lines)
+    if len(full) <= limit:
+        return full
+    bare = []
+    for l in lines:
+        m = re.match(r"- \[\[([^\]]+)\]\]", l)
+        if m:
+            bare.append("- [[%s]]" % m.group(1))
+    joined = "\n".join(bare)
+    if len(joined) <= limit:
+        return (
+            joined
+            + "\n  (descriptions trimmed to fit — all %d notes listed.)" % len(bare)
+        )
+    return _cap(joined, limit, "notes in this project")
+
 
 project_for = HL.project_for  # cwd -> memory folder (shared, git-root fallback)
 
@@ -76,6 +120,62 @@ def _stale_count(days=120):
     return n
 
 
+# Curation backlog thresholds. Nothing runs consolidation unattended, so the only thing
+# standing between a captured finding and a retrievable note is this signal. Recall ranks
+# curated notes and ignores Daily/ and Sessions/ entirely, so an un-consolidated vault
+# keeps capturing and stops retrieving — while still reporting a healthy note count.
+BACKLOG_MIN = 5  # unchecked promote-queue entries before we say anything
+BACKLOG_AGE = 7  # or this many days since the oldest unchecked entry
+BACKLOG_LOUD = 15  # past here it stops being a footnote
+
+
+def _consolidation_backlog():
+    """(count, oldest_age_days) of unchecked promote-queue entries. (0, 0) when the file
+    is absent or clean. Never raises."""
+    try:
+        q = os.path.join(MEM, "_infra", "_promote-queue.md")
+        if not os.path.exists(q):
+            return 0, 0
+        rows = [l for l in open(q, errors="ignore") if l.startswith("- [ ] ")]
+        if not rows:
+            return 0, 0
+        from datetime import date
+
+        oldest = None
+        for r in rows:
+            m = re.match(r"- \[ \] (\d{4})-(\d{2})-(\d{2})", r)
+            if not m:
+                continue
+            try:
+                d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            except ValueError:
+                continue
+            if oldest is None or d < oldest:
+                oldest = d
+        age = (date.today() - oldest).days if oldest else 0
+        return len(rows), age
+    except Exception as e:
+        HL.log_err("session-resume.backlog", e)
+        return 0, 0
+
+
+def _backlog_notice():
+    """One line when the curation backlog crosses a threshold, else None."""
+    count, age = _consolidation_backlog()
+    if count < BACKLOG_MIN and age < BACKLOG_AGE:
+        return None
+    loud = count >= BACKLOG_LOUD or age >= BACKLOG_AGE * 4
+    return (
+        "\n%s CURATION BACKLOG: %d finding%s still uncurated%s. Run `/second-brain consolidate` — until then recall cannot return any of them, because it ranks curated notes and ignores the journal."
+        % (
+            "🚨" if loud else "📥",
+            count,
+            "" if count == 1 else "s",
+            ", oldest %dd old" % age if age else "",
+        )
+    )
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -94,6 +194,12 @@ def main():
         "This is recent activity to resume from; the vault is the source of truth. "
         "Write back via the CAPTURE footer (see CLAUDE.md)."
     )
+
+    # Curation backlog — emitted HERE, before the long sections, because the tail is what
+    # the TOTAL_MAX backstop trims and this is the one signal that must survive.
+    notice = _backlog_notice()
+    if notice:
+        out.append(notice)
 
     # --- Distilled last-session digest (written by capture-exchange Stop hook) ---
     ls = os.path.join(MEM, "_infra", "_last-session.md")
@@ -171,9 +277,10 @@ def main():
             )
             out += tail
 
-    # --- Current project's note index (folder-bounded — grows with folders, not notes) ---
+    # --- Current project's note index (one folder only, and capped) ---
     # Only the shard for the current repo is loaded; every OTHER folder is a one-line
     # [[_index-<folder>]] pointer in the thin MEMORY.md, and its notes come via recall.
+    # The shard still grows with the notes in THIS folder, hence SHARD_MAX.
     if proj:
         shard = os.path.join(MEM, f"_index-{proj}.md")
         if os.path.exists(shard):
@@ -187,13 +294,13 @@ def main():
             lines = [l for l in body.split("\n") if l.startswith("- [[")]
             if lines:
                 out.append(f"\n## Note index — {proj} (this project)")
-                out += lines
+                out.append(_cap_index(lines, SHARD_MAX))
 
     # --- _Home map ---
     home = os.path.join(MEM, "_Home.md")
     if os.path.exists(home):
         out.append("\n## Home map")
-        out.append(open(home, errors="ignore").read())
+        out.append(_cap(open(home, errors="ignore").read(), HOME_MAX, "map lines"))
 
     # --- Passive stale nudge (ambient; only when there's something to nudge) ---
     try:
@@ -206,7 +313,14 @@ def main():
         HL.log_err("session-resume.stale", e)
 
     out.append("=== end Obsidian resume ===")
-    sys.stdout.write("\n".join(out) + "\n")
+    # Backstop: per-section caps bound the known offenders, this bounds the total in case
+    # a future section (or an unusually large digest) grows past them.
+    payload = "\n".join(out)
+    if len(payload) > TOTAL_MAX:
+        payload = (
+            _cap(payload, TOTAL_MAX, "resume lines") + "\n=== end Obsidian resume ==="
+        )
+    sys.stdout.write(payload + "\n")
 
     # Dedup handshake: tell memory-recall (UserPromptSubmit) what we already surfaced,
     # so the first prompts don't re-inject the same notes.

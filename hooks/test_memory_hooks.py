@@ -140,6 +140,125 @@ def test_session_resume_smoke_no_raw():
     assert "resume" in out
 
 
+def test_backlog_notice_thresholds():
+    """Consolidation is the step nothing runs for you, and skipping it silently breaks
+    retrieval: recall ranks curated notes and ignores the journal, so an uncurated
+    finding is unreachable no matter how faithfully it was captured."""
+    _bind()
+    sr = session_resume  # loaded via spec, already bound to the fixture vault
+    q = os.path.join(_VAULT, "_infra", "_promote-queue.md")
+    today = __import__("datetime").date.today()
+
+    def write(n, age_days):
+        day = (today - __import__("datetime").timedelta(days=age_days)).isoformat()
+        with open(q, "w") as f:
+            f.write("# Promote queue\n\n")
+            for i in range(n):
+                f.write("- [ ] %s 10:0%d — finding %d\n" % (day, i % 10, i))
+
+    # quiet: a small, fresh backlog is normal working state
+    write(2, 0)
+    assert sr._backlog_notice() is None, "2 fresh items must not nag"
+
+    # count threshold
+    write(sr.BACKLOG_MIN, 0)
+    n = sr._backlog_notice()
+    assert n and "CURATION BACKLOG" in n and str(sr.BACKLOG_MIN) in n
+
+    # age threshold alone is enough, even with a single item
+    write(1, sr.BACKLOG_AGE)
+    n = sr._backlog_notice()
+    assert n and "oldest" in n, "an old single item must still surface"
+    assert "1 finding still" in n, "singular wording: %r" % n
+
+    # escalation
+    write(sr.BACKLOG_LOUD, 1)
+    assert "🚨" in sr._backlog_notice()
+    write(sr.BACKLOG_MIN, 1)
+    assert "📥" in sr._backlog_notice()
+
+    # a fully checked-off queue is clean, and a missing file is not an error
+    with open(q, "w") as f:
+        f.write("# Promote queue\n\n- [x] %s — done\n" % today.isoformat())
+    assert sr._backlog_notice() is None, "checked-off items are not a backlog"
+    os.remove(q)
+    assert sr._backlog_notice() is None
+    assert sr._consolidation_backlog() == (0, 0)
+
+
+def test_backlog_notice_survives_truncation():
+    """The notice must sit ABOVE the long sections: TOTAL_MAX trims the tail, and this
+    is the one line that must not be the thing dropped."""
+    _bind()
+    sr = session_resume
+    today = __import__("datetime").date.today().isoformat()
+    os.makedirs(os.path.join(_VAULT, "_infra"), exist_ok=True)
+    with open(os.path.join(_VAULT, "_infra", "_promote-queue.md"), "w") as f:
+        f.write("# Promote queue\n\n")
+        for i in range(sr.BACKLOG_LOUD + 5):
+            f.write("- [ ] %s 10:00 — finding %d\n" % (today, i))
+    rc, out, err = _run_hook(
+        "session-resume.py", {"source": "startup", "cwd": "/home/u/code/widgets"}
+    )
+    assert rc == 0, err
+    assert "CURATION BACKLOG" in out, "backlog notice missing from resume output"
+    head = out[: len(out) // 2]
+    assert "CURATION BACKLOG" in head, "notice must be in the first half, not the tail"
+    os.remove(os.path.join(_VAULT, "_infra", "_promote-queue.md"))
+
+
+def test_resume_index_prefers_coverage_over_descriptions():
+    """A project index too large to inline with descriptions must degrade to bare links
+    for EVERY note, not an alphabetical slice — an unlisted note is one the model never
+    learns exists, while a missing description is one recall away."""
+    lines = [
+        "- [[note-%03d]] — %s" % (i, "a fairly long description " * 4)
+        for i in range(60)
+    ]
+    full = "\n".join(lines)
+
+    fits = session_resume._cap_index(lines, len(full) + 10)
+    assert fits == full, "an index under budget must be passed through untouched"
+
+    tight = session_resume._cap_index(lines, 2000)
+    assert len(tight) <= 2000 + 80, "must respect the budget (plus the notice line)"
+    for i in (0, 30, 59):
+        assert "[[note-%03d]]" % i in tight, "every note must still be listed"
+    assert "a fairly long description" not in tight, (
+        "descriptions should be the thing cut"
+    )
+    assert "all 60 notes listed" in tight
+
+    # so tight that even bare links cannot fit: then it truncates and says so
+    crushed = session_resume._cap_index(lines, 120)
+    assert "omitted" in crushed, "an unavoidable truncation must be declared"
+
+
+def test_resume_payload_is_bounded():
+    """The sharded index stopped MEMORY.md overflowing; the overflow then moved into
+    this hook, which pasted a whole shard and the whole _Home map verbatim."""
+    rc, out, err = _run_hook(
+        "session-resume.py", {"source": "startup", "cwd": "/home/u/code/widgets"}
+    )
+    assert rc == 0, err
+    assert len(out) <= session_resume.TOTAL_MAX + 200, (
+        "resume payload %d chars exceeds TOTAL_MAX %d"
+        % (len(out), session_resume.TOTAL_MAX)
+    )
+    assert session_resume.SHARD_MAX < session_resume.TOTAL_MAX
+    assert session_resume.HOME_MAX < session_resume.TOTAL_MAX
+
+
+def test_resume_cap_keeps_the_terminator():
+    """Truncating the tail must not eat the closing marker, or a reader cannot tell a
+    trimmed digest from a crashed hook."""
+    long_text = "\n".join("line %d" % i for i in range(500))
+    capped = session_resume._cap(long_text, 200, "lines")
+    assert len(capped) < len(long_text)
+    assert "omitted" in capped
+    assert not capped.endswith("\n"), "cap should end on a line boundary"
+
+
 def test_memory_recall_smoke():
     _bind()
     rc, out, err = _run_hook(
