@@ -7,17 +7,10 @@ project-biased. Silent on trivial/no-match prompts. Never blocks; logs failures.
 import sys, os, re, glob, json, time
 
 import _hooklib as HL
+import sb_rank
 
 MEM = HL.MEM
 STATE_DIR = os.path.join(MEM, ".recall-state")
-EXCLUDE = {"MEMORY.md", "context.md", "_session-log.md"}
-STOP = set(
-    "the a an and or of to in on for with is are was were be been this that these those i you "
-    "it we they he she how what why when where which who do does did can could should would will "
-    "just now then here there my your our their its from into out up down over about as at by so "
-    "if not no yes ok okay thanks please help make add use using get got need want like also more "
-    "most some any all one two new old via per etc pls better stronger strong full work works".split()
-)
 TRIVIAL = re.compile(
     r"^\s*(hi|hey|hello|yo|thanks|thank you|ok|okay|k|yep|yes|no|nope|cool|nice|"
     r"got it|sure|great|perfect|done|continue|go on|next|/\w+)\s*[.!]*\s*$",
@@ -27,55 +20,12 @@ TRIVIAL = re.compile(
 
 project_for = HL.project_for
 
-
-def words(s):
-    return set(re.findall(r"[a-z0-9]{3,}", s.lower()))
-
-
-def _age_days(head):
-    """Age in days from `last_confirmed` (preferred) or `asserted` frontmatter; None if absent."""
-    for key in ("last_confirmed", "asserted"):
-        # tolerate both flat v2 (`asserted:`) and nested (`  asserted:` under `metadata:`)
-        m = re.search(r"^\s*" + key + r":\s*([0-9]{4}-[0-9]{2}-[0-9]{2})", head, re.M)
-        if m:
-            try:
-                t = time.mktime(time.strptime(m.group(1), "%Y-%m-%d"))
-                return (time.time() - t) / 86400.0
-            except Exception:
-                return None
-    return None
-
-
-SKIP_DIRS = ("Daily", "Weekly", "_system", "Sessions")
-
-
-def _is_note(p):
-    """A real curated note — excludes index/meta files, journals, backups and dot-dirs.
-    Works at ANY depth, so root-level notes and nested folders both count."""
-    rel = os.path.relpath(p, MEM)
-    parts = rel.split(os.sep)
-    b = parts[-1]
-    if b in EXCLUDE or b.startswith("_") or b.startswith("."):
-        return False
-    for d in parts[:-1]:
-        if d in SKIP_DIRS or d.startswith("_backup") or d.startswith("."):
-            return False
-    return True
-
-
-def _all_notes():
-    """Every curated note in the vault, any depth (root-level included)."""
-    return [
-        p
-        for p in glob.glob(os.path.join(MEM, "**", "*.md"), recursive=True)
-        if _is_note(p)
-    ]
-
-
-def _folder(p):
-    """Top-level folder of a note ('' for vault root)."""
-    rel = os.path.relpath(p, MEM)
-    return rel.split(os.sep)[0] if os.sep in rel else ""
+# The note walk, the scoring and the index all live in sb_rank, so the MCP tool layer
+# and the eval harness rank identically to this hook.
+words = sb_rank.words
+_all_notes = sb_rank.all_notes
+_folder = sb_rank.folder_of
+STOP = sb_rank.STOP
 
 
 def _latest_addition():
@@ -157,7 +107,7 @@ def _emit_stats(proj):
 
 VENV_PY = HL.EMBED_VENV_PY  # optional semantic-embed venv (built by `sb-embed setup`)
 EMBED = HL.EMBED_SCRIPT
-RETIRED = ("retired", "deprecated", "archived", "superseded")
+RETIRED = sb_rank.RETIRED
 
 
 def _semantic_fill(prompt, exclude, need):
@@ -225,46 +175,12 @@ def main():
     if len(kw) < 3:
         return
 
-    rows = []
-    for p in _all_notes():
-        b = os.path.basename(p)
-        folder = _folder(p)
-        name = os.path.splitext(b)[0]
-        try:
-            head = open(p, errors="ignore").read(
-                6144
-            )  # cap read — hot path; covers most bodies
-        except Exception:
-            continue
-        m = re.search(r"^description:\s*(.+)$", head, re.M)
-        desc = (m.group(1).strip().strip("\"'")) if m else ""
-        nwords, dwords = words(name), words(desc)
-        # DISTINCT query keywords matched as whole words in the high-signal head
-        hit_name = kw & nwords
-        hit_desc = kw & dwords
-        head_hits = hit_name | hit_desc
-        if len(head_hits) < 2:  # gate: kills generic single-word noise (name/desc only)
-            continue
-        # low-weight body signal: keywords found in the body but not already in name/desc
-        body_extra = (kw & words(head)) - hit_name - hit_desc
-        sm = re.search(r"^\s*status:\s*(.+)$", head, re.M)
-        status = (sm.group(1).strip().strip("\"'").lower()) if sm else ""
-        if status in ("retired", "deprecated", "archived", "superseded"):
-            continue  # never auto-inject facts that were explicitly retired
-        score = 5 * len(hit_name) + 3 * len(hit_desc) + 1 * len(body_extra)
-        if proj and folder == proj:
-            score = int(score * 1.5)
-        # decay/freshness: boost recently-confirmed notes, penalize stale ones
-        age = _age_days(head)
-        if age is not None:
-            if age <= 30:
-                score = int(score * 1.25)
-            elif age > 365:
-                score = int(score * 0.6)
-            elif age > 180:
-                score = int(score * 0.8)
-        rows.append((score, name, folder, desc[:110], p))
-    rows.sort(reverse=True)
+    # Rank everything, then drop what this session already saw — filtering before the
+    # cut would return fewer than 4 notes on a repeat topic.
+    rows = [
+        (r["score"], r["name"], r["folder"], r["description"][:110], r["path"])
+        for r in sb_rank.rank(prompt, project=proj, limit=0)
+    ]
 
     os.makedirs(STATE_DIR, exist_ok=True)
     sf = os.path.join(STATE_DIR, re.sub(r"[^A-Za-z0-9_-]", "_", sid) + ".json")

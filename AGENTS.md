@@ -24,6 +24,14 @@ it once split the system across two vaults for six days without any error.
 **One transcript parser.** `_hooklib.scan_transcript()`. Three copies of that loop already
 drifted, and the 256 KB window in one of them silently dropped the largest turns.
 
+**One ranker.** `sb_rank.rank()`. The MCP tool layer used to carry its own copy, and it had
+drifted to globbing a single directory level — so notes at the vault root and in nested
+folders never ranked for Claude Desktop or Cursor.
+
+**Measure ranking changes.** Retrieval quality has a number now: `tests/eval`. Run it
+before and after any change to scoring, the note walk, or the index, and quote the delta in
+the pull request. Baseline and the follow-up measurements are in `tests/eval/README.md`.
+
 ## Hook rules
 
 Hooks run on every prompt, so they must be invisible when healthy:

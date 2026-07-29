@@ -45,6 +45,7 @@ _HOOK_DIR = next(
 )
 sys.path.insert(0, _HOOK_DIR)
 import _hooklib as HL  # noqa: E402
+import sb_rank  # noqa: E402  — the one ranker; this file used to carry a second copy
 
 MEM = HL.MEM
 SCRIPTS = next(
@@ -59,16 +60,9 @@ SCRIPTS = next(
     os.path.join(_THIS, "..", "skills", "second-brain", "scripts"),
 )
 
-SKIP_FOLDERS = ("Daily", "Weekly", "Sessions", "_system")
-EXCLUDE = {"MEMORY.md", "context.md", "_session-log.md"}
-RETIRED = ("retired", "deprecated", "archived", "superseded")
-STOP = set(
-    "the a an and or of to in on for with is are was were be been this that these those i you "
-    "it we they he she how what why when where which who do does did can could should would will "
-    "just now then here there my your our their its from into out up down over about as at by so "
-    "if not no yes ok okay thanks please help make add use using get got need want like also more "
-    "most some any all one two new old via per etc pls better stronger strong full work works".split()
-)
+# Owned by sb_rank so the ranker and this file can never disagree about what counts
+# as a note, a stopword or a retired status. Local copies had already drifted once.
+RETIRED = sb_rank.RETIRED
 _CHIP = {
     "active": "🟢 **active**",
     "watch": "🟡 **watch**",
@@ -79,10 +73,6 @@ _CHIP = {
 
 def _today():
     return time.strftime("%Y-%m-%d")
-
-
-def _words(s):
-    return set(re.findall(r"[a-z0-9]{3,}", (s or "").lower()))
 
 
 def _slug(s):
@@ -184,71 +174,25 @@ def _reindex():
 
 
 # --------------------------------------------------------------------------- #
-# rank — self-contained decay-aware keyword ranker (mirrors memory-recall.py,
-# does NOT import or modify it)
+# rank — thin wrapper over the shared ranker in hooks/sb_rank.py
 # --------------------------------------------------------------------------- #
-def _age_days(head):
-    for key in ("last_confirmed", "asserted"):
-        m = re.search(r"^\s*" + key + r":\s*(\d{4}-\d{2}-\d{2})", head, re.M)
-        if m:
-            try:
-                t = time.mktime(time.strptime(m.group(1), "%Y-%m-%d"))
-                return (time.time() - t) / 86400.0
-            except Exception:
-                return None
-    return None
-
-
 def rank(query, project=None, limit=5):
     """Decay-aware keyword ranking over curated notes. Returns
-    [{name, folder, description, score}], best first. Optional semantic fill."""
-    kw = {w for w in _words(query) if w not in STOP}
-    rows = []
-    if kw:
-        for p in glob.glob(os.path.join(MEM, "*", "*.md")):
-            b = os.path.basename(p)
-            if b in EXCLUDE or b.startswith("_"):
-                continue
-            folder = os.path.basename(os.path.dirname(p))
-            if folder in SKIP_FOLDERS:
-                continue
-            name = os.path.splitext(b)[0]
-            try:
-                head = open(p, errors="ignore").read(6144)
-            except Exception:
-                continue
-            sm = re.search(r"^\s*status:\s*(.+)$", head, re.M)
-            if sm and sm.group(1).strip().strip("\"'").lower() in RETIRED:
-                continue
-            m = re.search(r"^description:\s*(.+)$", head, re.M)
-            desc = (m.group(1).strip().strip("\"'")) if m else ""
-            hit_name = kw & _words(name)
-            hit_desc = kw & _words(desc)
-            body_extra = (kw & _words(head)) - hit_name - hit_desc
-            score = 5 * len(hit_name) + 3 * len(hit_desc) + 1 * len(body_extra)
-            if score <= 0:
-                continue
-            if project and folder == project:
-                score = int(score * 1.5)
-            age = _age_days(head)
-            if age is not None:
-                if age <= 30:
-                    score = int(score * 1.25)
-                elif age > 365:
-                    score = int(score * 0.6)
-                elif age > 180:
-                    score = int(score * 0.8)
-            rows.append(
-                {
-                    "name": name,
-                    "folder": folder,
-                    "description": desc[:150],
-                    "score": score,
-                }
-            )
-        rows.sort(key=lambda r: r["score"], reverse=True)
-    rows = rows[:limit]
+    [{name, folder, description, score}], best first. Optional semantic fill.
 
+    This used to be a second copy of the memory-recall scoring loop and it had
+    drifted: it globbed one directory level, so notes at the vault root and in
+    nested folders never ranked here, and Claude Desktop and Cursor could not see
+    them. It now delegates, so every surface ranks identically."""
+    rows = [
+        {
+            "name": r["name"],
+            "folder": r["folder"],
+            "description": r["description"],
+            "score": r["score"],
+        }
+        for r in sb_rank.rank(query, project=project, limit=limit)
+    ]
     need = limit - len(rows)
     if need > 0 and HL.embed_ready():
         have = {r["name"] for r in rows}
