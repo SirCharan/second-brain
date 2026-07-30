@@ -21,14 +21,21 @@ if (
     and not os.environ.get("SB_UTF8_REEXEC")
     and getattr(sys, "frozen", None) is None
 ):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
     os.environ["SB_UTF8_REEXEC"] = "1"
     try:
-        os.execv(
-            sys.executable,
-            [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]],
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
         )
-    except Exception:
-        pass  # fall through to the stream guard below rather than refusing to run
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         try:

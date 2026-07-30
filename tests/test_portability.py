@@ -80,6 +80,17 @@ def test_the_reexec_never_fires_from_an_imported_module():
         )
 
 
+def test_no_os_execv_anywhere():
+    """os.execv does not replace the process on Windows: the parent exits with its own
+    status while the child runs on, so callers read the wrong exit code. CI failed on
+    exactly that. Re-exec through subprocess and propagate the child's code."""
+    offenders = []
+    for p in entry_points():
+        if "os.execv" in p.read_text():
+            offenders.append(p.relative_to(REPO).as_posix())
+    assert not offenders, "os.execv is unreliable on Windows: " + ", ".join(offenders)
+
+
 def test_glyph_print_would_have_failed_without_the_guard():
     """Proves the guard is load-bearing rather than decorative."""
     out = subprocess.run(
