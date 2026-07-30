@@ -86,7 +86,8 @@ def test_no_os_execv_anywhere():
     exactly that. Re-exec through subprocess and propagate the child's code."""
     offenders = []
     for p in entry_points():
-        if "os.execv" in p.read_text():
+        # a call, not the word: the guard's own comment explains why it is avoided
+        if re.search(r"os\.execv\w*\s*\(", p.read_text()):
             offenders.append(p.relative_to(REPO).as_posix())
     assert not offenders, "os.execv is unreliable on Windows: " + ", ".join(offenders)
 
