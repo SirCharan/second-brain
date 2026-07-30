@@ -43,6 +43,43 @@ def test_every_entry_point_survives_a_cp1252_console():
     )
 
 
+def test_hook_commands_force_utf8_mode():
+    """Hooks read vault notes. Without -X utf8 a Windows open() uses cp1252 and raises
+    on the first emoji, which is how the pack install died mid-run."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("rh2", SCRIPTS / "register-hooks.py")
+    rh = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rh)
+    frag = rh.build("/h", "/usr/bin/python3")
+    for ev in frag.values():
+        for e in ev:
+            for h in e["hooks"]:
+                assert "-X utf8" in h["command"], h["command"]
+
+
+def test_entry_points_reexec_into_utf8_mode_on_windows():
+    """Scripts a user runs by hand get the same protection as the registered hooks."""
+    missing = []
+    for p in entry_points():
+        text = p.read_text()
+        if "SB_UTF8_REEXEC" not in text:
+            missing.append(p.relative_to(REPO).as_posix())
+    assert not missing, "no UTF-8 re-exec guard: " + ", ".join(missing)
+
+
+def test_the_reexec_never_fires_from_an_imported_module():
+    """_hooklib is imported by every hook. A re-exec there would relaunch the library
+    as a script instead of the hook."""
+    for p in entry_points():
+        text = p.read_text()
+        if "SB_UTF8_REEXEC" not in text:
+            continue
+        assert '__name__ == "__main__"  # never re-exec when imported' in text, (
+            f"{p.name} re-execs without a __main__ guard"
+        )
+
+
 def test_glyph_print_would_have_failed_without_the_guard():
     """Proves the guard is load-bearing rather than decorative."""
     out = subprocess.run(

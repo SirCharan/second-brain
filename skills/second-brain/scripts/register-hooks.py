@@ -19,8 +19,24 @@ import shutil
 import sys
 import time
 
-# Windows consoles default to cp1252, where the status glyphs this script prints raise
-# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        os.execv(
+            sys.executable,
+            [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]],
+        )
+    except Exception:
+        pass  # fall through to the stream guard below rather than refusing to run
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         try:
@@ -56,9 +72,11 @@ def build(hooks_dir, python):
             name, timeout = entry[0], entry[1]
             matcher = entry[2] if len(entry) > 2 else None
             script = os.path.join(hooks_dir, name + ".py")
+            # -X utf8: the vault is full of emoji, and a Windows console plus
+            # open() both default to cp1252, which raises on read and on print.
             hook = {
                 "type": "command",
-                "command": f"{quote(python)} {quote(script)}",
+                "command": f"{quote(python)} -X utf8 {quote(script)}",
                 "timeout": timeout,
             }
             block = {"hooks": [hook]}
