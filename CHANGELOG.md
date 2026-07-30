@@ -32,8 +32,7 @@ it is Linux; this is native PowerShell.
 ### Starter pack (opt-in)
 
 A fresh vault held six notes and no Obsidian configuration, so the graph looked dead on the
-day you installed it, and none of the working discipline the skill ecosystem assumes came
-with it.
+day you installed it. None of the working discipline the skills assume came with it either.
 
 - `starter-pack/` ships 22 skills across three tiers (`core`, `writing`, `design`), a
   `_playbook/` folder of working rules, two note templates, and an `.obsidian/` config with

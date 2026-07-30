@@ -108,9 +108,9 @@ Useful flags: `--dry-run` (show what would happen), `--no-setup` (skip the wizar
 
 ### Starter pack (optional)
 
-A new vault is nearly empty, so the graph — the reason to open it in Obsidian at all — has
-about six nodes on day one. The wizard offers a starter pack to fix that. Say no and nothing
-changes; the pack is not required for memory to work.
+A new vault is nearly empty. The graph is the reason to open it in Obsidian at all, and on day
+one it has about six nodes. The wizard offers a starter pack to fix that. Say no and nothing
+changes: the pack is not required for memory to work.
 
 | Tier | What you get |
 |---|---|
@@ -118,9 +118,9 @@ changes; the pack is not required for memory to work.
 | `writing` | `writing-router`, `writing-composition`, `writing-eval`, `simplified-technical-english` |
 | `design` | `design-router`, `design-system`, `anti-slop-design-law`, `anti-slop-design-audit`, `layout-interaction-design`, `motion-3d`, `dataviz-design`, and the per-type recipes for reports, landing pages, docs sites and calculators |
 
-It also seeds a `_playbook/` folder with the working rules those skills assume, two note
-templates, and an `.obsidian/` config with graph colour groups per folder and a dark theme —
-core Obsidian features only, no community plugins.
+It also seeds a `_playbook/` folder with the working rules those skills assume, plus two note
+templates. An `.obsidian/` config sets graph colour groups per folder and a dark theme. Core
+Obsidian features only, no community plugins.
 
 ```bash
 python3 ~/.claude/skills/second-brain/scripts/starter-pack.py --list          # see everything first
