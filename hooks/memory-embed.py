@@ -56,7 +56,12 @@ EXCLUDE = {"MEMORY.md", "context.md", "_session-log.md"}
 # ---------------------------------------------------------------- pure helpers
 def is_note(p):
     """Mirror memory-recall's note filter: real curated notes only, at any depth."""
-    rel = os.path.relpath(p, MEM)
+    try:
+        rel = os.path.relpath(p, MEM)
+    except ValueError:
+        # Windows raises when the path and the vault sit on different drives.
+        # Something outside the vault is not a note.
+        return False
     parts = rel.split(os.sep)
     b = parts[-1]
     if b in EXCLUDE or b.startswith("_") or b.startswith("."):
