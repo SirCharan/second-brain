@@ -202,6 +202,7 @@ jobs:
         shell: pwsh
         run: |
           python tests\test_starter_pack.py
+          python tests\test_portability.py
           Get-ChildItem hooks -Filter "test_*.py" | ForEach-Object {
             Write-Host "== $($_.Name) =="
             python $_.FullName
@@ -249,6 +250,9 @@ jobs:
 
       - name: Starter pack tests
         run: python3 tests/test_starter_pack.py
+
+      - name: Portability tests
+        run: python3 tests/test_portability.py
 
       - name: MCP test
         run: python3 mcp/test_mcp.py
