@@ -7,6 +7,15 @@ import sys, os, json, re, glob
 
 import _hooklib as HL
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 MEM = HL.MEM
 # Structural link targets that intentionally have no note file, plus any
 # user-declared ones from config.json "ignore_names".

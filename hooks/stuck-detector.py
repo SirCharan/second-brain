@@ -4,6 +4,15 @@ Failure = clear markers in the tool output (not bare 'error', not grep/test exit
 
 import sys, os, re, json
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 try:
     import _hooklib as HL
 except Exception:

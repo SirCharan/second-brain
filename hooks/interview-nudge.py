@@ -10,6 +10,15 @@ Never blocks; fails silent.
 
 import sys, json, re
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 BUILD_VERBS = re.compile(
     r"\b(build|create|implement|add|design|refactor|migrate|set ?up|ship|redesign|rewrite|"
     r"integrate|overhaul|scaffold|develop|architect|automate|revamp|rebuild|port|generate)\b",

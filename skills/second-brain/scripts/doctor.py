@@ -4,6 +4,15 @@ Read-only without --fix. Always exit 0 (it's a report)."""
 
 import os, re, sys, json, glob, subprocess
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 HOME = os.path.expanduser("~")
 WINDOWS = os.name == "nt"
 # Honour a relocated config dir; the vault default stays under ~/.claude to match

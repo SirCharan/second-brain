@@ -14,6 +14,15 @@ Never blocks. Prints a JSON additionalContext block only when over threshold.
 
 import sys, os, json
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 sys.path.insert(
     0, os.path.dirname(os.path.abspath(__file__))
 )  # _hooklib is a sibling (both install modes)

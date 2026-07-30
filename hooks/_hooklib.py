@@ -5,6 +5,16 @@ Import works because Python puts the running script's dir on sys.path[0]."""
 import os
 import subprocess, re, json, tempfile, time, traceback
 
+import sys
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 # Vault location: $CLAUDE_MEMORY_DIR wins, else a sensible default under ~/.claude.
 MEM = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.expanduser(
     "~/.claude/second-brain-vault"

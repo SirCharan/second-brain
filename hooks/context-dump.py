@@ -13,6 +13,15 @@ Writes _infra/_carryover.md and appends a one-line marker to today's Daily note.
 import sys, os, json, glob, re
 from datetime import datetime
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 sys.path.insert(
     0, os.path.dirname(os.path.abspath(__file__))
 )  # _hooklib is a sibling (both install modes)

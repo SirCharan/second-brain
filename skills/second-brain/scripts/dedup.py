@@ -14,6 +14,15 @@ asserted), since the newer note holds the fresher facts."""
 
 import os, re, sys, glob, argparse, itertools
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 # locate _hooklib in either install mode (same shim as export.py)
 _HD = next(
     (

@@ -12,6 +12,15 @@ No args → prints to stdout. Stdlib-only. Never raises on a bad note (skips it)
 
 import os, re, sys, glob
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 # locate _hooklib in either install mode
 _HD = next(
     (

@@ -19,6 +19,15 @@ import sys
 import glob
 import tarfile
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 SKIP_SEGS = ("Daily", "Weekly", "Sessions", "_system")
 TOKEN_RE = re.compile(
     r"https?://[^\s)\]>\"']+"  # URLs

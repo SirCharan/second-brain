@@ -4,6 +4,15 @@ _MOC-system) and _projects.md + per-MOC Links blocks. Idempotent. Local vault on
 
 import os, re, glob, shutil, sys
 
+# Windows consoles default to cp1252, where the status glyphs this script prints raise
+# UnicodeEncodeError and abort it mid-run. UTF-8 with replacement can never raise.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 _here = os.path.dirname(os.path.abspath(__file__))
 _HD = next(
     (
