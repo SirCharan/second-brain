@@ -56,8 +56,25 @@ facts are retired via `status: retired` + `supersedes`, so the whole vault is gi
 
 ## Requirements
 
-Claude Code, Python 3.8 or newer, and `bash`. macOS and Linux are tested in CI on every
-commit. Windows is not supported.
+Claude Code and Python 3.8 or newer. macOS, Linux and Windows are each tested in CI on every
+commit.
+
+The hooks are Python and are registered to run under your Python interpreter directly, so
+`bash` is not required. The `.sh` wrappers in `hooks/` are a convenience for running a hook by
+hand on macOS or Linux; nothing depends on them.
+
+**Windows.** Use `install.ps1` in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/SirCharan/second-brain/main/install.ps1 | iex
+```
+
+Two things differ. Semantic recall's setup script (`embed-setup.sh`) is bash, so that optional
+extra is macOS and Linux only — keyword recall, which is the default, works everywhere. And
+mirroring the vault into an existing Obsidian folder via `SECOND_BRAIN_OBSIDIAN_LINK` uses a
+directory junction rather than a symlink, because Windows refuses symlinks without Developer
+Mode; `doctor.py --fix` handles that automatically and warns rather than fails if both are
+blocked. WSL2 also works, using the normal `install.sh`.
 
 ## Install
 
@@ -132,6 +149,10 @@ It reports what is configured and prints the exact command for anything that is 
 bash uninstall.sh                 # removes the machinery, keeps every note
 bash uninstall.sh --purge-vault   # also deletes the vault (asks first)
 ```
+
+On Windows: `.\uninstall.ps1` and `.\uninstall.ps1 -PurgeVault`. Either way, removal is driven
+by the install manifest, so it takes out exactly what was installed — including any starter-pack
+skills — and nothing else.
 
 ### Alternative: Claude Code plugin
 

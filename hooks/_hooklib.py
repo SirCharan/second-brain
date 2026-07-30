@@ -2,7 +2,8 @@
 """Shared helpers for the memory hooks. Python 3.9-safe, stdlib-only.
 Import works because Python puts the running script's dir on sys.path[0]."""
 
-import os, re, json, tempfile, time, traceback
+import os
+import subprocess, re, json, tempfile, time, traceback
 
 # Vault location: $CLAUDE_MEMORY_DIR wins, else a sensible default under ~/.claude.
 MEM = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.expanduser(
@@ -25,7 +26,11 @@ ERRLOG = os.path.join(STATE_DIR, "hook-errors.log")
 # builds this venv with fastembed; until then embed_ready() is False and recall stays
 # keyword-only. The embed script sits next to this file (both install modes).
 EMBED_SCRIPT = os.path.join(HOOK_DIR, "memory-embed.py")
-EMBED_VENV_PY = os.path.join(STATE_DIR, "venv-embed", "bin", "python")
+EMBED_VENV_PY = os.path.join(
+    STATE_DIR,
+    "venv-embed",
+    *(("Scripts", "python.exe") if os.name == "nt" else ("bin", "python")),
+)
 
 
 def embed_ready():
@@ -49,6 +54,17 @@ def load_config():
 
 CONFIG = load_config()
 
+
+
+def detach_kwargs():
+    """Popen kwargs that let a background refresh outlive this hook, per platform.
+    start_new_session is POSIX-only, so Windows gets the equivalent creation flag."""
+    if os.name == "nt":
+        flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
+            subprocess, "DETACHED_PROCESS", 0
+        )
+        return {"creationflags": flags}
+    return {"start_new_session": True}
 
 def vault_ok():
     """True only if the memory dir is present — hooks no-op cleanly otherwise."""

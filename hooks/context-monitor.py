@@ -106,7 +106,7 @@ def main():
                 [sys.executable, dump, tpath],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                start_new_session=True,
+                **(HL.detach_kwargs() if HL else {}),
             )
     except Exception as e:
         if HL:

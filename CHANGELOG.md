@@ -4,6 +4,31 @@ Notable changes per release. The current version lives in [`VERSION`](VERSION).
 
 ## 0.6.0
 
+### Windows
+
+Windows was unsupported for four specific reasons, all now fixed. WSL2 always worked because
+it is Linux; this is native PowerShell.
+
+- Hooks are registered as `"<python>" "<hook>.py"` instead of `bash "<hook>.sh"`. The wrappers
+  only ever pinned an interpreter and swallowed errors, and every hook `.py` already catches
+  everything and exits 0 — which matters because a non-zero `UserPromptSubmit` hook blocks the
+  prompt. The `.sh` files remain in the repo for running a hook by hand. Registration still
+  prefers `/usr/bin/python3` over a pyenv shim, which is what the wrappers were protecting.
+- `session-memory` had no Python twin. It does now (`hooks/session-memory.py`), so no hook
+  needs a shell.
+- `install.ps1` and `uninstall.ps1` are first-class equivalents of the shell scripts. Hook
+  registration and the manifest moved into `scripts/register-hooks.py`, which both installers
+  call, so the two cannot drift. The Windows interpreter probe tries `py -3` and `python`
+  before `python3`, which is the Microsoft Store stub.
+- `doctor.py` tries a symlink, falls back to a directory junction (no Developer Mode needed),
+  and warns instead of failing if both are refused. It also honours `CLAUDE_CONFIG_DIR`, and no
+  longer demands the `.sh` wrappers or an executable bit on Windows.
+- The embed venv path (`Scripts\python.exe` vs `bin/python`) and the background-refresh launch
+  flags (`start_new_session` is POSIX-only) are now per-platform.
+- CI gained a `windows-latest` job that installs via `install.ps1`, asserts no registration
+  shells out to bash, runs all nine hooks expecting exit 0, gates on `doctor --strict`, and
+  uninstalls. Semantic recall stays macOS and Linux only: its setup script is bash.
+
 ### Starter pack (opt-in)
 
 A fresh vault held six notes and no Obsidian configuration, so the graph looked dead on the

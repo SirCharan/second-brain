@@ -31,8 +31,10 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CLAUDE = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
-DEFAULT_VAULT = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.join(
-    CLAUDE, "second-brain-vault"
+# Same rule as _hooklib and install.sh: CLAUDE_MEMORY_DIR wins, else the default path
+# under ~/.claude — deliberately not under CLAUDE_CONFIG_DIR, so all three agree.
+DEFAULT_VAULT = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.expanduser(
+    "~/.claude/second-brain-vault"
 )
 HOME_LINE = (
     "- [[_MOC-playbook]] — the working rules: session habits, phase discipline, routing"
