@@ -12,7 +12,7 @@ No args → prints to stdout. Stdlib-only. Never raises on a bad note (skips it)
 
 import os, re, sys, glob
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -85,7 +85,7 @@ def _arg(flag, default=None):
 def parse_note(path):
     """Return (name, title, meta_line, body) with frontmatter stripped. None on failure."""
     try:
-        raw = open(path, errors="ignore").read()
+        raw = open(path, errors="ignore", encoding="utf-8").read()
     except Exception:
         return None
     fm, body = {}, raw
@@ -169,7 +169,7 @@ def main():
 
     text = "\n".join(lines).rstrip() + "\n"
     if out:
-        with open(out, "w") as f:
+        with open(out, "w", encoding="utf-8") as f:
             f.write(text)
         sys.stderr.write(f"exported {len(notes)} notes → {out} ({len(text)} bytes)\n")
     else:

@@ -8,7 +8,7 @@ import sys, os, json, re, glob
 
 import _hooklib as HL
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -72,7 +72,7 @@ def main():
     if not os.path.exists(rp):
         return
 
-    txt = open(rp, errors="ignore").read()
+    txt = open(rp, errors="ignore", encoding="utf-8").read()
     warns = []
     if not txt.startswith("---\n") or txt.find("\n---", 4) == -1:
         warns.append("no YAML frontmatter")

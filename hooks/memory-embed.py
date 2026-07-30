@@ -13,7 +13,7 @@ to a clean no-op if the model/deps are unavailable."""
 
 import os, re, sys, glob, math, sqlite3, struct
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -73,7 +73,7 @@ def note_text(path):
     """Text to embed: name + description + a slice of the body (frontmatter stripped)."""
     name = os.path.splitext(os.path.basename(path))[0]
     try:
-        raw = open(path, errors="ignore").read()
+        raw = open(path, errors="ignore", encoding="utf-8").read()
     except Exception:
         return name
     body = re.sub(r"^---\n.*?\n---\n", "", raw, count=1, flags=re.S)

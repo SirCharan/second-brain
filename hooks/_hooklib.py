@@ -6,7 +6,7 @@ import os
 import subprocess, re, json, tempfile, time, traceback
 
 import sys
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -78,7 +78,7 @@ def load_config():
     import json
 
     try:
-        with open(os.path.join(MEM, "config.json"), errors="ignore") as f:
+        with open(os.path.join(MEM, "config.json"), errors="ignore", encoding="utf-8") as f:
             cfg = json.load(f)
             return cfg if isinstance(cfg, dict) else {}
     except Exception:
@@ -111,7 +111,7 @@ def atomic_write(path, text):
     os.makedirs(d, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp-", suffix=".swap")
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
         os.replace(tmp, path)
         return True
@@ -127,7 +127,7 @@ def read_json(path, default=None):
     import json
 
     try:
-        with open(path, errors="ignore") as f:
+        with open(path, errors="ignore", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {} if default is None else default
@@ -148,11 +148,11 @@ def log_err(hook, exc):
             (repr(exc) if not isinstance(exc, str) else exc)[:300],
         )
         os.makedirs(os.path.dirname(ERRLOG), exist_ok=True)
-        with open(ERRLOG, "a") as f:
+        with open(ERRLOG, "a", encoding="utf-8") as f:
             f.write(line)
         # trim if it grows past ~500 lines
         if os.path.getsize(ERRLOG) > 120_000:
-            with open(ERRLOG, errors="ignore") as f:
+            with open(ERRLOG, errors="ignore", encoding="utf-8") as f:
                 tail = f.readlines()[-300:]
             atomic_write(ERRLOG, "".join(tail))
     except Exception:

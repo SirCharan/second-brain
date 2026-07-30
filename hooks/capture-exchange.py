@@ -9,7 +9,7 @@ from datetime import datetime
 
 import _hooklib as HL
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -103,7 +103,7 @@ def _write_session_note(now, sid, proj, branch, entry, links, scan=None):
         path = os.path.join(sdir, f"{day}__{sid8}.md")
         log, related, txt = [], [], ""
         if os.path.exists(path):
-            txt = open(path, errors="ignore").read()
+            txt = open(path, errors="ignore", encoding="utf-8").read()
             log = re.findall(r"^- \*\*\d\d:\d\d\*\* .*$", txt, re.M)
             if "## Related" in txt:
                 related = re.findall(r"\[\[([^\]]+)\]\]", txt.split("## Related", 1)[1])
@@ -184,7 +184,7 @@ def _update_note_debt(now, sid, proj, files):
         if os.path.exists(path):
             existing = [
                 l.rstrip()
-                for l in open(path, errors="ignore")
+                for l in open(path, errors="ignore", encoding="utf-8")
                 if l.startswith("- [ ] ")
             ]
         # drop entries whose project gained a note after the recorded baseline
@@ -312,7 +312,7 @@ def main():
     dfile = os.path.join(ddir, day + ".md")
     # exclusive create of the header (no double-header race between concurrent Stops)
     try:
-        with open(dfile, "x") as f:
+        with open(dfile, "x", encoding="utf-8") as f:
             f.write(
                 f"---\nname: {day}\ntags: [journal, meta]\n---\n\n# {day}\n\n"
                 f"Auto-captured exchanges (via `capture-exchange` Stop hook). ↩ [[_Home]]\n\n"
@@ -325,14 +325,14 @@ def main():
     # bookkeeping below must still run, or a repeated turn would silently drop all of it.
     dup = False
     try:
-        prev = [l for l in open(dfile, errors="ignore") if l.startswith("- **")]
+        prev = [l for l in open(dfile, errors="ignore", encoding="utf-8") if l.startswith("- **")]
         dup = bool(prev) and re.sub(r"^- \*\*\d\d:\d\d\*\*", "", prev[-1]).strip() == (
             f"{ctx} — {entry}".strip()
         )
     except Exception:
         pass
     if not dup:
-        with open(dfile, "a") as f:  # append is atomic for a single small write
+        with open(dfile, "a", encoding="utf-8") as f:  # append is atomic for a single small write
             f.write(f"- **{now.strftime('%H:%M')}**{ctx} — {entry}\n")
 
     # Distilled last-session digest (overwritten each turn) — session-resume.py injects this on
@@ -354,7 +354,7 @@ def main():
         try:
             os.makedirs(os.path.dirname(q), exist_ok=True)
             try:
-                with open(q, "x") as f:
+                with open(q, "x", encoding="utf-8") as f:
                     f.write(
                         "---\nname: _promote-queue\ntags: [meta, type/index]\n---\n\n"
                         "# Promote queue\n\nResearch/learnings flagged for curation into atomic "
@@ -363,7 +363,7 @@ def main():
                     )
             except FileExistsError:
                 pass
-            with open(q, "a") as f:
+            with open(q, "a", encoding="utf-8") as f:
                 f.write(f"- [ ] {day} {now.strftime('%H:%M')}{ctx} — {entry}\n")
         except Exception as e:
             HL.log_err("capture-exchange.queue", e)

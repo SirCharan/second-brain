@@ -35,7 +35,7 @@ def _note(rel, name, desc, body="", status="active", date=None):
     p = os.path.join(_VAULT, rel)
     os.makedirs(os.path.dirname(p) or _VAULT, exist_ok=True)
     date = date or time.strftime("%Y-%m-%d")
-    with open(p, "w") as f:
+    with open(p, "w", encoding="utf-8") as f:
         f.write(
             "---\nname: %s\ndescription: %s\nasserted: %s\nlast_confirmed: %s\n"
             "status: %s\n---\n\n# %s\n\n%s\n"
@@ -160,7 +160,7 @@ def test_index_written_and_reused():
     _bind()
     sb_rank.rank("widget cache tuning")
     assert os.path.isfile(sb_rank.index_path()), "ranking must persist an index"
-    idx = json.load(open(sb_rank.index_path()))
+    idx = json.load(open(sb_rank.index_path(), encoding="utf-8"))
     assert idx["v"] == sb_rank.INDEX_V
     assert any("buried-widget" in k for k in idx["notes"]), idx["notes"].keys()
     before = os.path.getmtime(sb_rank.index_path())
@@ -190,13 +190,13 @@ def test_index_drops_a_deleted_note():
     os.remove(p)
     got = [r["name"] for r in sb_rank.rank("widget cache tuning", limit=10)]
     assert "temporary" not in got, "a deleted note must leave the index"
-    idx = json.load(open(sb_rank.index_path()))
+    idx = json.load(open(sb_rank.index_path(), encoding="utf-8"))
     assert not any("temporary" in k for k in idx["notes"]), "stale key must be pruned"
 
 
 def test_broken_index_degrades_to_a_full_read():
     _bind()
-    with open(sb_rank.index_path(), "w") as f:
+    with open(sb_rank.index_path(), "w", encoding="utf-8") as f:
         f.write("{not json at all")
     got = [r["name"] for r in sb_rank.rank("widget cache tuning", limit=10)]
     assert "buried-widget" in got, "a corrupt index must not break recall"

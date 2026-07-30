@@ -5,7 +5,7 @@ Failure = clear markers in the tool output (not bare 'error', not grep/test exit
 import os
 import sys, os, re, json
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -75,7 +75,7 @@ def main():
     os.makedirs(STATE_DIR, exist_ok=True)
     sf = os.path.join(STATE_DIR, re.sub(r"[^A-Za-z0-9_-]", "_", sid) + ".json")
     try:
-        st = json.load(open(sf))
+        st = json.load(open(sf, encoding="utf-8"))
     except Exception:
         st = {}
 
@@ -102,7 +102,7 @@ def _save(sf, st):
         if HL:
             HL.write_json(sf, st)
         else:
-            json.dump(st, open(sf, "w"))
+            json.dump(st, open(sf, "w", encoding="utf-8"))
     except Exception:
         pass
 

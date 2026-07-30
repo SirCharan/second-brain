@@ -15,7 +15,7 @@ Never blocks. Prints a JSON additionalContext block only when over threshold.
 import os
 import sys, os, json
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -117,12 +117,12 @@ def main():
         prev = 0
         if os.path.exists(flag):
             try:
-                prev = int(open(flag).read().strip() or 0)
+                prev = int(open(flag, encoding="utf-8").read().strip() or 0)
             except Exception:
                 prev = 0
         if prev and tokens <= prev * 1.3:
             return
-        open(flag, "w").write(str(tokens))
+        open(flag, "w", encoding="utf-8").write(str(tokens))
     except Exception:
         pass
 

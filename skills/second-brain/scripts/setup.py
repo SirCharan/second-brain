@@ -23,7 +23,7 @@ import os
 import subprocess
 import sys
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -124,7 +124,7 @@ def find_repos():
 def load_config(vault):
     p = os.path.join(vault, "config.json")
     try:
-        with open(p) as f:
+        with open(p, encoding="utf-8") as f:
             cfg = json.load(f)
             return cfg if isinstance(cfg, dict) else {}
     except (OSError, ValueError):
@@ -135,7 +135,7 @@ def save_config(vault, cfg):
     p = os.path.join(vault, "config.json")
     os.makedirs(vault, exist_ok=True)
     tmp = p + ".tmp"
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
         f.write("\n")
     os.replace(tmp, p)

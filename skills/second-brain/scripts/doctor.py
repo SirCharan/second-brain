@@ -4,7 +4,7 @@ Read-only without --fix. Always exit 0 (it's a report)."""
 
 import os, re, sys, json, glob, subprocess
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -221,7 +221,7 @@ chk(
 )
 # registration in settings.json
 try:
-    d = json.load(open(SETTINGS))
+    d = json.load(open(SETTINGS, encoding="utf-8"))
     H = d.get("hooks", {})
     cmds = " ".join(
         h.get("command", "")
@@ -284,7 +284,7 @@ notes = [
 def _has_status(path):
     """Parse the real frontmatter block — a fixed char window misses notes whose
     description pushes `status:` further down."""
-    t = open(path, errors="ignore").read()
+    t = open(path, errors="ignore", encoding="utf-8").read()
     if not t.startswith("---\n"):
         return False
     end = t.find("\n---", 4)
@@ -318,7 +318,7 @@ chk(
 # error log tail
 elog = os.path.join(STATE_DIR, "hook-errors.log")
 if os.path.exists(elog):
-    tail = open(elog, errors="ignore").read().strip().splitlines()[-3:]
+    tail = open(elog, errors="ignore", encoding="utf-8").read().strip().splitlines()[-3:]
     chk(
         "hook-errors.log",
         len(tail) == 0,
@@ -352,7 +352,7 @@ chk(
 # project routing — the single most common reason notes land in the wrong place
 _cfg_path = os.path.join(MEM, "config.json")
 try:
-    _pmap = (json.load(open(_cfg_path)) or {}).get("project_map") or {}
+    _pmap = (json.load(open(_cfg_path, encoding="utf-8")) or {}).get("project_map") or {}
 except Exception:
     _pmap = {}
 chk(
@@ -386,7 +386,7 @@ if sys.platform == "darwin":
 for cname, cpath in _clients.items():
     reg = False
     try:
-        reg = "second-brain" in json.load(open(cpath)).get("mcpServers", {})
+        reg = "second-brain" in json.load(open(cpath, encoding="utf-8")).get("mcpServers", {})
     except Exception:
         reg = False
     chk(

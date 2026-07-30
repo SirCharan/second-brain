@@ -19,7 +19,7 @@ import shutil
 import sys
 import time
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -80,7 +80,7 @@ def build(hooks_dir, python):
             matcher = entry[2] if len(entry) > 2 else None
             script = os.path.join(hooks_dir, name + ".py")
             # -X utf8: the vault is full of emoji, and a Windows console plus
-            # open() both default to cp1252, which raises on read and on print.
+            # open(, encoding="utf-8") both default to cp1252, which raises on read and on print.
             hook = {
                 "type": "command",
                 "command": f"{quote(python)} -X utf8 {quote(script)}",
@@ -116,7 +116,7 @@ def main(argv):
     data, backup = {}, None
     if os.path.exists(settings):
         try:
-            with open(settings) as f:
+            with open(settings, encoding="utf-8") as f:
                 data = json.load(f)
         except ValueError:
             print(
@@ -140,7 +140,7 @@ def main(argv):
         data.pop("hooks", None)
 
     tmp = settings + ".tmp"
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
     os.replace(tmp, settings)
@@ -175,7 +175,7 @@ def main(argv):
     infra = os.path.join(vault, "_infra")
     os.makedirs(infra, exist_ok=True)
     mp = os.path.join(infra, "_install-manifest.json")
-    with open(mp, "w") as f:
+    with open(mp, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")
     print(f"  ✓ manifest written to {mp}")

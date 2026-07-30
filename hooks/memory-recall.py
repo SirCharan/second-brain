@@ -10,7 +10,7 @@ import sys, os, re, glob, json, time
 import _hooklib as HL
 import sb_rank
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -66,7 +66,7 @@ def _latest_addition():
     else the most-recently-modified note name."""
     dfiles = sorted(glob.glob(os.path.join(MEM, "Daily", "20*.md")))
     for df in reversed(dfiles):
-        lines = [l.rstrip() for l in open(df, errors="ignore") if l.startswith("- ")]
+        lines = [l.rstrip() for l in open(df, errors="ignore", encoding="utf-8") if l.startswith("- ")]
         if lines:
             return re.sub(
                 r"^- \*\*\d{1,2}:\d{2}\*\*(\s*\[[^\]]*\])?\s*—\s*", "", lines[-1]
@@ -85,7 +85,7 @@ def _emit_note_debt():
         if not os.path.exists(path):
             return
         rows = [
-            l.strip() for l in open(path, errors="ignore") if l.startswith("- [ ] ")
+            l.strip() for l in open(path, errors="ignore", encoding="utf-8") if l.startswith("- [ ] ")
         ]
         if not rows:
             return
@@ -174,7 +174,7 @@ def _semantic_fill(prompt, exclude, need):
             continue
         d = ""
         try:
-            head = open(os.path.join(MEM, folder, name + ".md"), errors="ignore").read(
+            head = open(os.path.join(MEM, folder, name + ".md"), errors="ignore", encoding="utf-8").read(
                 2048
             )
             sm = re.search(r"^\s*status:\s*(.+)$", head, re.M)
@@ -244,11 +244,11 @@ def main():
         extra = []
         try:
             if i == 0 and os.path.getsize(p) <= SPLIT_GATE:
-                body = open(p, errors="ignore").read()
+                body = open(p, errors="ignore", encoding="utf-8").read()
                 body = re.sub(r"^---\n.*?\n---\n", "", body, count=1, flags=re.S)
                 extra = ["", body.strip(), ""]
             else:
-                head = open(p, errors="ignore").read(2048)
+                head = open(p, errors="ignore", encoding="utf-8").read(2048)
                 extra = [
                     "  " + l.strip()[:160]
                     for l in head.splitlines()

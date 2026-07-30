@@ -4,7 +4,7 @@
 the top matches, so you get the actual answer/fix — not just a title. Bounded output."""
 import os, re, glob, sys
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -47,7 +47,7 @@ for p in glob.glob(os.path.join(MEM, "**", "*.md"), recursive=True):
     if b in ("_session-log.md",):     # skip only the raw session log
         continue
     try:
-        txt = open(p, errors="ignore").read()
+        txt = open(p, errors="ignore", encoding="utf-8").read()
     except Exception:
         continue
     low = txt.lower(); name = os.path.splitext(b)[0].lower()

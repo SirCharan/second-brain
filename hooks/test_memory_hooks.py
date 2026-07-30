@@ -10,7 +10,7 @@ import os, sys, json, subprocess, tempfile, importlib.util
 _VAULT = tempfile.mkdtemp(prefix="sb-test-vault-")
 for _d in ("Daily", "Sessions", "_infra"):
     os.makedirs(os.path.join(_VAULT, _d), exist_ok=True)
-with open(os.path.join(_VAULT, "config.json"), "w") as _f:
+with open(os.path.join(_VAULT, "config.json"), "w", encoding="utf-8") as _f:
     json.dump(
         {
             "project_map": {"widgets": "widgets", "acme-web": "acme"},
@@ -18,7 +18,7 @@ with open(os.path.join(_VAULT, "config.json"), "w") as _f:
         },
         _f,
     )
-with open(os.path.join(_VAULT, "MEMORY.md"), "w") as _f:
+with open(os.path.join(_VAULT, "MEMORY.md"), "w", encoding="utf-8") as _f:
     _f.write("# MEMORY\n")
 os.environ["CLAUDE_MEMORY_DIR"] = _VAULT
 
@@ -151,7 +151,7 @@ def test_backlog_notice_thresholds():
 
     def write(n, age_days):
         day = (today - __import__("datetime").timedelta(days=age_days)).isoformat()
-        with open(q, "w") as f:
+        with open(q, "w", encoding="utf-8") as f:
             f.write("# Promote queue\n\n")
             for i in range(n):
                 f.write("- [ ] %s 10:0%d — finding %d\n" % (day, i % 10, i))
@@ -178,7 +178,7 @@ def test_backlog_notice_thresholds():
     assert "📥" in sr._backlog_notice()
 
     # a fully checked-off queue is clean, and a missing file is not an error
-    with open(q, "w") as f:
+    with open(q, "w", encoding="utf-8") as f:
         f.write("# Promote queue\n\n- [x] %s — done\n" % today.isoformat())
     assert sr._backlog_notice() is None, "checked-off items are not a backlog"
     os.remove(q)
@@ -193,7 +193,7 @@ def test_backlog_notice_survives_truncation():
     sr = session_resume
     today = __import__("datetime").date.today().isoformat()
     os.makedirs(os.path.join(_VAULT, "_infra"), exist_ok=True)
-    with open(os.path.join(_VAULT, "_infra", "_promote-queue.md"), "w") as f:
+    with open(os.path.join(_VAULT, "_infra", "_promote-queue.md"), "w", encoding="utf-8") as f:
         f.write("# Promote queue\n\n")
         for i in range(sr.BACKLOG_LOUD + 5):
             f.write("- [ ] %s 10:00 — finding %d\n" % (today, i))

@@ -19,7 +19,7 @@ import sys
 import glob
 import tarfile
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -75,7 +75,7 @@ def tokens(text):
 def backup_tokens(tar_path):
     """token -> first source member that carried it."""
     out = {}
-    with tarfile.open(tar_path) as tf:
+    with tarfile.open(tar_path, encoding="utf-8") as tf:
         for m in tf.getmembers():
             if not m.name.endswith(".md") or _skip(m.name):
                 continue
@@ -95,7 +95,7 @@ def current_tokens(vault):
         if any(seg.startswith(("_backup", ".")) for seg in rel.split(os.sep)[:-1]):
             continue  # backups moved out don't count as "still present"
         try:
-            out |= tokens(open(p, errors="ignore").read())
+            out |= tokens(open(p, errors="ignore", encoding="utf-8").read())
         except Exception:
             pass
     return out

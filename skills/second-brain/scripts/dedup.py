@@ -14,7 +14,7 @@ asserted), since the newer note holds the fresher facts."""
 
 import os, re, sys, glob, argparse, itertools
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -96,7 +96,7 @@ def _date_key(s):
 def _parse(path):
     """Return {name, folder, title, desc, tags:set, date, tri:set} or None."""
     try:
-        head = open(path, errors="ignore").read(6144)
+        head = open(path, errors="ignore", encoding="utf-8").read(6144)
     except Exception:
         return None
     fm = {}
@@ -211,17 +211,17 @@ def _selftest():
 
     d = tempfile.mkdtemp(prefix="sb-dedup-test-")
     os.makedirs(os.path.join(d, "proj"))
-    open(os.path.join(d, "proj", "a.md"), "w").write(
+    open(os.path.join(d, "proj", "a.md"), "w", encoding="utf-8").write(
         "---\nname: a\ntitle: Drishti signal cadence\n"
         "description: Drishti runs a five minute signal cadence cycle.\n"
         "tags: [signals, project/widgets]\nlast_confirmed: 2026-01-01\nstatus: active\n---\n# A\n"
     )
-    open(os.path.join(d, "proj", "b.md"), "w").write(
+    open(os.path.join(d, "proj", "b.md"), "w", encoding="utf-8").write(
         "---\nname: b\ntitle: Drishti signal cadence\n"
         "description: Drishti runs a 5 minute signal cadence cycle.\n"
         "tags: [signals, project/widgets]\nlast_confirmed: 2026-06-01\nstatus: active\n---\n# B\n"
     )
-    open(os.path.join(d, "proj", "c.md"), "w").write(
+    open(os.path.join(d, "proj", "c.md"), "w", encoding="utf-8").write(
         "---\nname: c\ntitle: Vercel deploy token\n"
         "description: Ship widgets projects with one deploy command from the web dir.\n"
         "tags: [tooling]\nlast_confirmed: 2026-03-01\nstatus: active\n---\n# C\n"

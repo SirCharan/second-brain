@@ -4,7 +4,7 @@ to any memory note missing them. Safe to re-run. Defaults dates to file mtime.""
 
 import os, re, glob, sys
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -69,7 +69,7 @@ for p in glob.glob(os.path.join(MEM, "**", "*.md"), recursive=True):
         continue
 
     try:
-        t = open(p, errors="ignore").read()
+        t = open(p, errors="ignore", encoding="utf-8").read()
     except Exception:
         continue
     if not t.startswith("---\n"):

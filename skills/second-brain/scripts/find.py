@@ -3,7 +3,7 @@
 Scores name(3) + description(2) + body(1) hits; prints top matches."""
 import os, re, glob, sys
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -42,7 +42,7 @@ rows=[]
 for p in glob.glob(os.path.join(MEM,"**","*.md"),recursive=True):
     b=os.path.basename(p)
     if b in ("MEMORY.md","context.md","_session-log.md") or "/Daily/" in p: continue
-    txt=open(p,errors="ignore").read(); low=txt.lower()
+    txt=open(p,errors="ignore", encoding="utf-8").read(); low=txt.lower()
     name=os.path.splitext(b)[0]
     m=re.search(r'^description:\s*(.+)$',txt[:600],re.M); desc=(m.group(1).strip().strip('"\'') if m else "")
     score=0

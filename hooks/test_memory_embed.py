@@ -43,7 +43,7 @@ def test_is_note():
 def test_note_text_strips_frontmatter():
     d = tempfile.mkdtemp()
     p = os.path.join(d, "widgets-expiry-leak.md")
-    open(p, "w").write(
+    open(p, "w", encoding="utf-8").write(
         '---\nname: x\ndescription: "the expiry leak note"\ntags: [signals]\n---\n'
         "Body about ATR brackets and expiry.\n"
     )

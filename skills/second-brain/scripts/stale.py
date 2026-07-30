@@ -12,7 +12,7 @@ oldest first, with age. Skips notes already status: retired/superseded. Stdlib-o
 import os, re, sys, glob
 from datetime import date
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -82,7 +82,7 @@ def _arg(flag, default=None):
 
 def _fm(path):
     try:
-        raw = open(path, errors="ignore").read(1200)
+        raw = open(path, errors="ignore", encoding="utf-8").read(1200)
     except Exception:
         return {}
     m = re.match(r"^---\n(.*?)\n---", raw, re.S)

@@ -10,7 +10,7 @@ Stdlib-only. Never raises on a bad note."""
 
 import os, re, sys, glob
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -80,7 +80,7 @@ def _arg(flag, default=None):
 
 def note_name(path):
     try:
-        raw = open(path, errors="ignore").read(600)
+        raw = open(path, errors="ignore", encoding="utf-8").read(600)
     except Exception:
         return None
     m = re.search(r"^name:\s*(.+)$", raw, re.M)
@@ -115,7 +115,7 @@ def main():
             continue
         labels[src] = src
         try:
-            body = open(path, errors="ignore").read()
+            body = open(path, errors="ignore", encoding="utf-8").read()
         except Exception:
             continue
         for tgt in re.findall(r"\[\[([^\]|#]+)", body):
@@ -143,7 +143,7 @@ def main():
     text = "\n".join(lines) + "\n"
 
     if out:
-        with open(out, "w") as f:
+        with open(out, "w", encoding="utf-8") as f:
             f.write(text)
         sys.stderr.write(
             f"graph → {out} ({len(kept)} nodes, {len(kept_edges)} edges)\n"

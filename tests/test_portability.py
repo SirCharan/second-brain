@@ -104,6 +104,51 @@ def test_internal_launches_start_the_child_in_utf8_mode():
     assert not offenders, "child launched without -X utf8: " + ", ".join(offenders)
 
 
+def test_no_text_open_without_an_explicit_encoding():
+    """Interpreter UTF-8 mode only covers processes we start. A module imported by
+    something else still gets the locale encoding, which is how the session note went
+    silently unwritten on Windows: atomic_write raised and the caller swallowed it.
+
+    Parsed rather than grepped, so prose about open() cannot trip it."""
+    import ast as _ast
+
+    def is_binary(call):
+        for arg in call.args[1:]:
+            if isinstance(arg, _ast.Constant) and isinstance(arg.value, str):
+                if "b" in arg.value:
+                    return True
+        for kw in call.keywords:
+            if kw.arg == "mode" and isinstance(kw.value, _ast.Constant):
+                if "b" in str(kw.value.value):
+                    return True
+        return False
+
+    def name_of(func):
+        if isinstance(func, _ast.Name):
+            return func.id
+        if isinstance(func, _ast.Attribute):
+            return f"{getattr(func.value, 'id', '')}.{func.attr}"
+        return ""
+
+    offenders = []
+    for p in entry_points() + sorted((REPO / "tests").glob("test_*.py")):
+        tree = _ast.parse(p.read_text(encoding="utf-8"))
+        for node in _ast.walk(tree):
+            if not isinstance(node, _ast.Call):
+                continue
+            if name_of(node.func) not in ("open", "os.fdopen"):
+                continue
+            if any(kw.arg == "encoding" for kw in node.keywords) or is_binary(node):
+                continue
+            # os.devnull is a sink, never note content
+            if any(
+                isinstance(a, _ast.Attribute) and a.attr == "devnull" for a in node.args
+            ):
+                continue
+            offenders.append(f"{p.relative_to(REPO).as_posix()}:{node.lineno}")
+    assert not offenders, "text open() without encoding: " + ", ".join(offenders[:10])
+
+
 def test_glyph_print_would_have_failed_without_the_guard():
     """Proves the guard is load-bearing rather than decorative."""
     out = subprocess.run(

@@ -8,7 +8,7 @@ import sys, os, json, re, glob
 
 import _hooklib as HL
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -99,7 +99,7 @@ def _is_junk(ln):
 
 def desc(path):
     try:
-        t = open(path, errors="ignore").read()[:600]
+        t = open(path, errors="ignore", encoding="utf-8").read()[:600]
     except Exception:
         return ""
     m = re.search(r"^\s*description:\s*(.+)$", t, re.M)
@@ -122,7 +122,7 @@ def _stale_count(days=120):
             continue
         seen += 1
         try:
-            head = open(p, errors="ignore").read(1200)
+            head = open(p, errors="ignore", encoding="utf-8").read(1200)
         except Exception:
             continue
         m = re.match(r"^---\n(.*?)\n---", head, re.S)
@@ -169,7 +169,7 @@ def _consolidation_backlog():
         q = os.path.join(MEM, "_infra", "_promote-queue.md")
         if not os.path.exists(q):
             return 0, 0
-        rows = [l for l in open(q, errors="ignore") if l.startswith("- [ ] ")]
+        rows = [l for l in open(q, errors="ignore", encoding="utf-8") if l.startswith("- [ ] ")]
         if not rows:
             return 0, 0
         from datetime import date
@@ -238,7 +238,7 @@ def main():
     ls = os.path.join(MEM, "_infra", "_last-session.md")
     if os.path.exists(ls):
         try:
-            body = open(ls, errors="ignore").read()
+            body = open(ls, errors="ignore", encoding="utf-8").read()
             body = re.sub(r"^---.*?---\s*", "", body, count=1, flags=re.S).strip()
             if body:
                 out.append("\n" + body)
@@ -250,7 +250,7 @@ def main():
     proj_lines, glob_lines = [], []
     for df in dfiles:
         day = os.path.splitext(os.path.basename(df))[0]
-        for ln in open(df, errors="ignore"):
+        for ln in open(df, errors="ignore", encoding="utf-8"):
             ln = ln.rstrip()
             if not ln.startswith("- ") or _is_junk(ln):
                 continue
@@ -301,7 +301,7 @@ def main():
         last = dfiles[-1]
         tail = [
             l.rstrip()
-            for l in open(last, errors="ignore")
+            for l in open(last, errors="ignore", encoding="utf-8")
             if l.startswith("- ") and not _is_junk(l)
         ][-8:]
         if tail:
@@ -320,7 +320,7 @@ def main():
             body = re.sub(
                 r"^---\n.*?\n---\n",
                 "",
-                open(shard, errors="ignore").read(),
+                open(shard, errors="ignore", encoding="utf-8").read(),
                 count=1,
                 flags=re.S,
             )
@@ -333,7 +333,7 @@ def main():
     home = os.path.join(MEM, "_Home.md")
     if os.path.exists(home):
         out.append("\n## Home map")
-        out.append(_cap(open(home, errors="ignore").read(), HOME_MAX, "map lines"))
+        out.append(_cap(open(home, errors="ignore", encoding="utf-8").read(), HOME_MAX, "map lines"))
 
     # --- Passive stale nudge (ambient; only when there's something to nudge) ---
     try:

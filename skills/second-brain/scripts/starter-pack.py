@@ -29,7 +29,7 @@ import shutil
 import subprocess
 import sys
 
-# Windows defaults to cp1252 for console output AND for open(), so both printing a status
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
 # can only be set at startup, so re-exec into it once when we were not started that way.
 if (
@@ -101,7 +101,7 @@ def find_source(explicit=None):
 
 def load(path, default=None):
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except (OSError, ValueError):
         return default
@@ -159,7 +159,7 @@ def link_playbook_from_home(vault, dry):
     home = os.path.join(vault, "_Home.md")
     if not os.path.isfile(home):
         return False
-    text = open(home).read()
+    text = open(home, encoding="utf-8").read()
     if "_MOC-playbook" in text:
         return False
     anchor = "### 🗂️ Notes"
@@ -168,7 +168,7 @@ def link_playbook_from_home(vault, dry):
     else:
         text = text.rstrip("\n") + "\n" + HOME_LINE + "\n"
     if not dry:
-        with open(home, "w") as f:
+        with open(home, "w", encoding="utf-8") as f:
             f.write(text)
     return True
 
@@ -189,7 +189,7 @@ def record_in_install_manifest(vault, dirs, workflows, dry):
     if not dry:
         os.makedirs(os.path.dirname(mp), exist_ok=True)
         tmp = mp + ".tmp"
-        with open(tmp, "w") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(man, f, indent=2)
             f.write("\n")
         os.replace(tmp, mp)
