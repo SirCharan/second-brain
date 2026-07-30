@@ -33,7 +33,7 @@ def test_every_entry_point_survives_a_cp1252_console():
     UTF-8 guard dies mid-run there, which is how the manifest went unwritten."""
     missing = []
     for p in entry_points():
-        text = p.read_text()
+        text = p.read_text(encoding="utf-8")
         if GUARD in text:
             continue
         if re.search(r"[^\x00-\x7F]", text):
@@ -62,7 +62,7 @@ def test_entry_points_reexec_into_utf8_mode_on_windows():
     """Scripts a user runs by hand get the same protection as the registered hooks."""
     missing = []
     for p in entry_points():
-        text = p.read_text()
+        text = p.read_text(encoding="utf-8")
         if "SB_UTF8_REEXEC" not in text:
             missing.append(p.relative_to(REPO).as_posix())
     assert not missing, "no UTF-8 re-exec guard: " + ", ".join(missing)
@@ -72,7 +72,7 @@ def test_the_reexec_never_fires_from_an_imported_module():
     """_hooklib is imported by every hook. A re-exec there would relaunch the library
     as a script instead of the hook."""
     for p in entry_points():
-        text = p.read_text()
+        text = p.read_text(encoding="utf-8")
         if "SB_UTF8_REEXEC" not in text:
             continue
         assert '__name__ == "__main__"  # never re-exec when imported' in text, (
@@ -87,9 +87,21 @@ def test_no_os_execv_anywhere():
     offenders = []
     for p in entry_points():
         # a call, not the word: the guard's own comment explains why it is avoided
-        if re.search(r"os\.execv\w*\s*\(", p.read_text()):
+        if re.search(r"os\.execv\w*\s*\(", p.read_text(encoding="utf-8")):
             offenders.append(p.relative_to(REPO).as_posix())
     assert not offenders, "os.execv is unreliable on Windows: " + ", ".join(offenders)
+
+
+def test_internal_launches_start_the_child_in_utf8_mode():
+    """SB_UTF8_REEXEC is inherited, so a child launched without -X utf8 skips its own
+    guard and reads notes as cp1252. build-system-index.py failed exactly that way."""
+    launch = re.compile(r"\[\s*(?:sys\.executable|VENV_PY|venv)\s*,")
+    offenders = []
+    for p in entry_points():
+        for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            if launch.search(line) and '"-X"' not in line:
+                offenders.append(f"{p.relative_to(REPO).as_posix()}:{i}")
+    assert not offenders, "child launched without -X utf8: " + ", ".join(offenders)
 
 
 def test_glyph_print_would_have_failed_without_the_guard():
@@ -130,7 +142,7 @@ def test_no_posix_only_popen_arguments():
     for p in entry_points():
         if p.name == "_hooklib.py":
             continue
-        if "start_new_session" in p.read_text():
+        if "start_new_session" in p.read_text(encoding="utf-8"):
             offenders.append(p.relative_to(REPO).as_posix())
     assert not offenders, "raw start_new_session outside _hooklib: " + ", ".join(
         offenders
@@ -141,7 +153,7 @@ def test_no_hardcoded_path_separators_in_vault_walks():
     """Folder names come from splitting a relative path, which must use os.sep."""
     offenders = []
     for p in entry_points():
-        for i, line in enumerate(p.read_text().splitlines(), 1):
+        for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
             if re.search(r"relpath\([^)]*\)\.split\(\s*[\"']/[\"']\s*\)", line):
                 offenders.append(f"{p.relative_to(REPO).as_posix()}:{i}")
     assert not offenders, "split on a literal slash: " + ", ".join(offenders)

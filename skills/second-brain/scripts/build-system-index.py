@@ -78,11 +78,13 @@ SYS = os.path.join(MEM, "_system")
 
 def w(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    open(path, "w").write(text)
+    # explicit encoding: the notes carry emoji and a Windows default of cp1252 raises
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
 
 
 def fm_desc(p):
-    t = open(p, errors="ignore").read()
+    t = open(p, encoding="utf-8", errors="ignore").read()
     m = re.search(r"^description:\s*(.+?)(?:\n[a-zA-Z_]+:|\n---)", t, re.S | re.M)
     if not m:
         m = re.search(r"^description:\s*(.+)$", t, re.M)
@@ -92,7 +94,7 @@ def fm_desc(p):
 # ---------- CLAUDE.md (refreshed copy) ----------
 os.makedirs(SYS, exist_ok=True)
 if os.path.exists(CLAUDE_MD):
-    body = open(CLAUDE_MD, errors="ignore").read()
+    body = open(CLAUDE_MD, encoding="utf-8", errors="ignore").read()
     w(
         os.path.join(SYS, "CLAUDE.md"),
         "---\nname: CLAUDE\ntags: [meta, type/system]\n---\n\n> Live copy of `"

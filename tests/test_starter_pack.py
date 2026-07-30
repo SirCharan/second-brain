@@ -24,8 +24,8 @@ _spec = importlib.util.spec_from_file_location("starter_pack", SCRIPT)
 sp = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(sp)
 
-TIERS = json.load(open(os.path.join(PACK, "tiers.json")))
-MANIFEST = json.load(open(os.path.join(PACK, "manifest.json")))
+TIERS = json.load(open(os.path.join(PACK, "tiers.json"), encoding="utf-8"))
+MANIFEST = json.load(open(os.path.join(PACK, "manifest.json"), encoding="utf-8"))
 TIER_NAMES = [t for t in TIERS if not t.startswith("_")]
 ALL_SKILLS = [s for t in TIER_NAMES for s in TIERS[t]["skills"]]
 
@@ -44,7 +44,9 @@ def run(claude, vault, *args):
     """Invoke the installer in-process, with the module's globals pointed at the temp dirs.
     Its progress output is swallowed so the suite's own pass/fail lines stay readable."""
     sp.CLAUDE = claude
-    with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
+    with open(os.devnull, "w", encoding="utf-8") as devnull, contextlib.redirect_stdout(
+        devnull
+    ):
         return sp.main(["--source", PACK, "--vault", vault, *args])
 
 
@@ -99,7 +101,7 @@ def test_no_private_references():
             if not f.endswith(".md"):
                 continue
             p = os.path.join(root, f)
-            for i, line in enumerate(open(p, errors="ignore"), 1):
+            for i, line in enumerate(open(p, encoding="utf-8", errors="ignore"), 1):
                 if banned.search(line):
                     hits.append(f"{os.path.relpath(p, PACK)}:{i}")
     assert not hits, "private references in the shipped pack: " + ", ".join(hits[:8])
@@ -149,11 +151,11 @@ def test_vault_content_and_obsidian():
         assert os.path.isfile(os.path.join(vault, rel)), f"missing {rel}"
     obs = os.path.join(vault, ".obsidian")
     assert os.path.isfile(os.path.join(obs, "graph.json"))
-    graph = json.load(open(os.path.join(obs, "graph.json")))
+    graph = json.load(open(os.path.join(obs, "graph.json"), encoding="utf-8"))
     assert graph["colorGroups"], "graph config has no colour groups"
     # core plugins only: a community-plugins list would break the no-plugins promise
     assert not os.path.exists(os.path.join(obs, "community-plugins.json"))
-    assert "_MOC-playbook" in open(os.path.join(vault, "_Home.md")).read()
+    assert "_MOC-playbook" in open(os.path.join(vault, "_Home.md"), encoding="utf-8").read()
 
 
 def test_never_overwrites():
@@ -161,20 +163,20 @@ def test_never_overwrites():
     # a skill the user already has, under a name the pack also ships
     mine = os.path.join(claude, "skills", "discovery")
     os.makedirs(mine)
-    open(os.path.join(mine, "SKILL.md"), "w").write("MINE, DO NOT TOUCH\n")
+    open(os.path.join(mine, "SKILL.md"), "w", encoding="utf-8").write("MINE, DO NOT TOUCH\n")
     # a vault note and an Obsidian config the user already has
     os.makedirs(os.path.join(vault, "_playbook"), exist_ok=True)
-    open(os.path.join(vault, "_playbook", "session-habits.md"), "w").write("MY NOTE\n")
+    open(os.path.join(vault, "_playbook", "session-habits.md"), "w", encoding="utf-8").write("MY NOTE\n")
     os.makedirs(os.path.join(vault, ".obsidian"))
-    open(os.path.join(vault, ".obsidian", "app.json"), "w").write("{}\n")
+    open(os.path.join(vault, ".obsidian", "app.json"), "w", encoding="utf-8").write("{}\n")
 
     run(claude, vault, "--tiers", "all")
-    assert open(os.path.join(mine, "SKILL.md")).read() == "MINE, DO NOT TOUCH\n"
+    assert open(os.path.join(mine, "SKILL.md"), encoding="utf-8").read() == "MINE, DO NOT TOUCH\n"
     assert (
-        open(os.path.join(vault, "_playbook", "session-habits.md")).read()
+        open(os.path.join(vault, "_playbook", "session-habits.md"), encoding="utf-8").read()
         == "MY NOTE\n"
     )
-    assert open(os.path.join(vault, ".obsidian", "app.json")).read() == "{}\n"
+    assert open(os.path.join(vault, ".obsidian", "app.json"), encoding="utf-8").read() == "{}\n"
     assert not os.path.exists(os.path.join(vault, ".obsidian", "graph.json")), (
         "an existing .obsidian must be left whole, not merged into"
     )
@@ -187,14 +189,14 @@ def test_rerun_is_a_noop():
         p: os.path.getmtime(os.path.join(claude, "skills", p))
         for p in os.listdir(os.path.join(claude, "skills"))
     }
-    home_before = open(os.path.join(vault, "_Home.md")).read()
+    home_before = open(os.path.join(vault, "_Home.md"), encoding="utf-8").read()
     run(claude, vault, "--tiers", "all")
     after = {
         p: os.path.getmtime(os.path.join(claude, "skills", p))
         for p in os.listdir(os.path.join(claude, "skills"))
     }
     assert stamp == after, "a re-run rewrote something"
-    home_after = open(os.path.join(vault, "_Home.md")).read()
+    home_after = open(os.path.join(vault, "_Home.md"), encoding="utf-8").read()
     assert home_after == home_before, "_Home.md gained a second playbook link"
     assert home_after.count("_MOC-playbook") == 1
 
@@ -202,7 +204,7 @@ def test_rerun_is_a_noop():
 def test_records_paths_for_uninstall():
     claude, vault = fresh()
     run(claude, vault, "--tiers", "core")
-    man = json.load(open(os.path.join(vault, "_infra", "_install-manifest.json")))
+    man = json.load(open(os.path.join(vault, "_infra", "_install-manifest.json"), encoding="utf-8"))
     dirs = set(man["dirs"])
     for s in TIERS["core"]["skills"]:
         assert os.path.join(claude, "skills", s) in dirs, (

@@ -152,7 +152,7 @@ def _semantic_fill(prompt, exclude, need):
         import subprocess
 
         r = subprocess.run(
-            [VENV_PY, EMBED, "query", prompt, "12"],
+            [VENV_PY, "-X", "utf8", EMBED, "query", prompt, "12"],
             capture_output=True,
             text=True,
             timeout=10,

@@ -136,7 +136,7 @@ def main():
         )
         if os.path.exists(dump):
             subprocess.Popen(
-                [sys.executable, dump, tpath],
+                [sys.executable, "-X", "utf8", dump, tpath],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 **(HL.detach_kwargs() if HL else {}),

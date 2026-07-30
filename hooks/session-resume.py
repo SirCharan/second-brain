@@ -376,7 +376,7 @@ def main():
             import subprocess
 
             subprocess.Popen(
-                [venv, embed, "build"],
+                [venv, "-X", "utf8", embed, "build"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 **(HL.detach_kwargs() if HL else {}),

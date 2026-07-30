@@ -202,7 +202,7 @@ def run_starter_pack(vault, tiers):
     env = dict(os.environ, CLAUDE_MEMORY_DIR=vault)
     try:
         subprocess.run(
-            [sys.executable, script, "--tiers", tiers],
+            [sys.executable, "-X", "utf8", script, "--tiers", tiers],
             env=env,
             check=False,
             timeout=300,
@@ -349,7 +349,7 @@ def main():
     if os.path.exists(doctor):
         print(f"\n{bold('4. Checking the install')}")
         env = dict(os.environ, CLAUDE_MEMORY_DIR=vault)
-        subprocess.run([sys.executable, doctor], env=env, check=False)
+        subprocess.run([sys.executable, "-X", "utf8", doctor], env=env, check=False)
 
     print(f"""
 {bold("Done.")} Restart Claude Code so the hooks load, then just work normally —

@@ -335,7 +335,9 @@ def main(argv=None):
     if os.path.isfile(index) and os.path.isdir(vault) and not dry:
         env = dict(os.environ, CLAUDE_MEMORY_DIR=vault, CLAUDE_CONFIG_DIR=CLAUDE)
         try:
-            subprocess.run([sys.executable, index], env=env, check=False, timeout=120)
+            subprocess.run(
+                [sys.executable, "-X", "utf8", index], env=env, check=False, timeout=120
+            )
         except Exception as e:  # noqa: BLE001 — an index refresh is never worth failing over
             print(
                 f"  ! could not refresh _system/ ({e}). Run /second-brain index later."
