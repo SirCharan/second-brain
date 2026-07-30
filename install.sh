@@ -120,6 +120,11 @@ chmod +x "$CLAUDE"/hooks/*.sh
 rm -rf "$CLAUDE/skills/second-brain"
 cp -R "$REPO/skills/second-brain" "$CLAUDE/skills/second-brain"
 cp "$REPO/workflows/vault-enrich.js" "$CLAUDE/workflows/vault-enrich.js"
+# The starter-pack source ships with the skill, not just in the repo: under `curl | bash`
+# the repo is a temp dir, so without this the user could never add a tier later.
+if [ -d "$REPO/starter-pack" ]; then
+  cp -R "$REPO/starter-pack" "$CLAUDE/skills/second-brain/starter-pack"
+fi
 echo "  ✓ hooks, skill, workflow copied"
 
 # --- vault ------------------------------------------------------------------
@@ -157,9 +162,8 @@ if [ "$VAULT" != "$HOME/.claude/second-brain-vault" ]; then
 fi
 
 # --- guided setup -----------------------------------------------------------
-# SB_REPO lets setup.py/starter-pack.py find starter-pack/, which stays in the repo
-# rather than being copied into $CLAUDE. Under `curl | bash` the repo is a temp dir,
-# so this is the only handle they get.
+# SB_REPO points setup.py/starter-pack.py at this checkout, so a re-run from a clone
+# picks up local edits rather than the copy installed above.
 export SB_REPO="$REPO"
 SETUP="$CLAUDE/skills/second-brain/scripts/setup.py"
 PACK_SCRIPT="$CLAUDE/skills/second-brain/scripts/starter-pack.py"

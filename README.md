@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/SirCharan/second-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/SirCharan/second-brain/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.0-informational.svg)](CHANGELOG.md)
-[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey.svg)](#requirements)
+[![Version](https://img.shields.io/badge/version-0.6.0-informational.svg)](CHANGELOG.md)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)](#requirements)
 
 A file-based **second brain for [Claude Code](https://claude.com/claude-code)**. Hooks quietly
 capture every session into an Obsidian-compatible Markdown vault, recall the relevant notes into
@@ -94,7 +94,8 @@ captured without you doing anything.
 your vault, and `~/.claude/settings.json` (backed up to `settings.json.bak` first). Existing
 hooks and settings are merged, never replaced. Re-run it any time to upgrade. Accepting the
 optional starter pack below adds skill directories under `~/.claude/skills/`, which are recorded
-in the same manifest.
+in the same manifest. The pack's source is installed alongside the skill, so you can add another
+tier later without cloning the repo again.
 
 Prefer to read the script before running it? Clone and run it locally:
 

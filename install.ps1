@@ -130,6 +130,11 @@ $skillDst = Join-Path $Claude "skills\second-brain"
 if (Test-Path $skillDst) { Remove-Item $skillDst -Recurse -Force }
 Copy-Item (Join-Path $Repo "skills\second-brain") -Destination $skillDst -Recurse -Force
 Copy-Item (Join-Path $Repo "workflows\vault-enrich.js") -Destination (Join-Path $Claude "workflows") -Force
+# The starter-pack source ships with the skill, not just in the repo: piped through iex
+# the repo is a temp dir, so without this the user could never add a tier later.
+if (Test-Path (Join-Path $Repo "starter-pack")) {
+    Copy-Item (Join-Path $Repo "starter-pack") -Destination (Join-Path $skillDst "starter-pack") -Recurse -Force
+}
 Write-Host "  + hooks, skill, workflow copied"
 
 # --- vault ------------------------------------------------------------------
@@ -154,8 +159,8 @@ if ($Vault -ne (Join-Path $HOME ".claude\second-brain-vault")) {
 }
 
 # --- guided setup -----------------------------------------------------------
-# SB_REPO lets setup.py find starter-pack\, which stays in the repo rather than
-# being copied into the config dir.
+# SB_REPO points setup.py at this checkout, so a re-run from a clone picks up local
+# edits rather than the copy installed above.
 $env:SB_REPO = $Repo
 $env:CLAUDE_MEMORY_DIR = $Vault
 $setup = Join-Path $skillDst "scripts\setup.py"
