@@ -15,6 +15,22 @@ No database, no server, no Obsidian plugins at runtime. Just Markdown files with
 YAML frontmatter, and a handful of stdlib-only Python/bash hooks. Open the vault in
 [Obsidian](https://obsidian.md) if you want the graph view — it's plain Markdown either way.
 
+> **Want just the hooks?** [continuum](https://github.com/SirCharan/continuum) is the stripped-down
+> sibling of this repo — the same idea in stdlib Python, with no plugin manifest, no MCP server and
+> no test suite. Start there if you want to read the whole thing in one sitting, or start here if
+> you want the parts that make it hold up over months of daily use.
+>
+> | | continuum | second-brain |
+> |---|---|---|
+> | Install | clone + `./install.sh` | one-line `curl \| bash` |
+> | Capture, recall, compaction snapshot | yes | yes |
+> | Skill | `/obsidian` | `/second-brain` |
+> | Claude Code plugin manifest | no | yes |
+> | MCP server | no | yes |
+> | Workflows (`vault-enrich`) | no | yes |
+> | Tests + CI | no | yes, macOS and Linux |
+> | License | MIT | Apache-2.0 |
+
 ## Why
 
 Every AI vendor is racing to remember you — and to make sure that memory only works inside *their*
