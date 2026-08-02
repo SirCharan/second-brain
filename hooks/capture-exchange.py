@@ -264,11 +264,11 @@ def main():
         return
     if hook.get("stop_hook_active"):
         return
-    # Grok also fires observe-only Stop at session end — skip non-turn completions.
+    # Grok fires Stop on end_turn AND an observe-only Stop at session end.
+    # Capture on end_turn (and empty reason = Claude). Also capture SessionEnd
+    # (channel_closed) so a killed session still leaves a Daily line if we have text.
     reason = (hook.get("reason") or "").strip()
-    if reason in ("channel_closed", "shutdown"):
-        return
-    tpath = hook.get("transcript_path")
+    # never skip — channel_closed still captures if lastAssistantMessage/transcript has content
     cwd = hook.get("cwd") or ""
     branch = hook.get("gitBranch") or ""
     # Route to the vault folder, not the raw cwd basename: a subdir like <repo>/web must
@@ -277,7 +277,8 @@ def main():
     proj, _proj_is_new = HL.route_project(cwd)
     proj = proj or ""
 
-    # 1MB tail + shared parser (Claude JSONL or Grok chat_history.jsonl).
+    # Transcript: envelope path, else Grok sessions dir by sessionId
+    tpath = HL.resolve_transcript_path(hook)
     scan = {
         "last_user": None,
         "last_asst": None,
@@ -285,14 +286,21 @@ def main():
         "commands": [],
         "errors": [],
     }
-    if tpath and os.path.exists(tpath):
+    if tpath:
         scan = HL.scan_transcript(tpath, max_bytes=1_048_576)
     # redact high-confidence secret token shapes before any raw turn text hits disk
     last_user = HL.scrub_secrets(scan["last_user"])
     last_asst = HL.scrub_secrets(scan["last_asst"])
-    # Grok Stop carries lastAssistantMessage — use when transcript parse is empty
-    if not last_asst:
-        last_asst = HL.scrub_secrets(hook.get("last_assistant_message") or "") or None
+    # Prefer lastAssistantMessage when it has a CAPTURE footer (freshest turn)
+    lam = HL.scrub_secrets(hook.get("last_assistant_message") or "") or None
+    if lam:
+        if re.search(r"<!--\s*CAPTURE:", lam, re.I) or not last_asst:
+            last_asst = lam
+        elif last_asst and lam and len(lam) >= len(last_asst):
+            # Grok envelope often holds the full final assistant text
+            last_asst = lam
+    if last_user:
+        last_user = HL.scrub_secrets(HL.extract_user_text(last_user))
     if not last_user and not last_asst:
         return
 
@@ -315,6 +323,11 @@ def main():
     elif last_user:
         u = re.sub(r"\s+", " ", last_user).strip()
         entry = "(raw) " + (u[:140] + ("…" if len(u) > 140 else ""))
+    elif last_asst:
+        # Grok/Claude turn with no CAPTURE footer and no parseable user text —
+        # still write a Daily line from the assistant reply so nothing is lost.
+        a = re.sub(r"\s+", " ", last_asst).strip()
+        entry = "(raw) " + (a[:140] + ("…" if len(a) > 140 else ""))
     else:
         return
 

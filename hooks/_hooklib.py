@@ -423,6 +423,58 @@ def normalize_hook(hook):
     return out
 
 
+
+def resolve_transcript_path(hook):
+    """Return a readable transcript path for Claude or Grok.
+    Prefer envelope transcript_path; else locate ~/.grok/sessions/**/<sessionId>/chat_history.jsonl.
+    Never raises."""
+    if not isinstance(hook, dict):
+        hook = {}
+    tpath = hook.get("transcript_path") or hook.get("transcriptPath")
+    if tpath and os.path.isfile(tpath):
+        return tpath
+    sid = (
+        hook.get("session_id")
+        or hook.get("sessionId")
+        or os.environ.get("GROK_SESSION_ID")
+        or ""
+    )
+    sid = str(sid).strip()
+    if not sid:
+        return None
+    base = os.path.expanduser("~/.grok/sessions")
+    if not os.path.isdir(base):
+        return None
+    try:
+        # Fast path: any directory named exactly the session id
+        for root, dirs, files in os.walk(base):
+            if os.path.basename(root) == sid and "chat_history.jsonl" in files:
+                return os.path.join(root, "chat_history.jsonl")
+        # Prefix match (short sid8)
+        for root, dirs, files in os.walk(base):
+            bn = os.path.basename(root)
+            if bn.startswith(sid) and "chat_history.jsonl" in files:
+                return os.path.join(root, "chat_history.jsonl")
+    except Exception as e:
+        log_err("resolve_transcript_path", e)
+    return None
+
+
+def extract_user_text(s):
+    """Pull the real user ask out of harness wrappers (Grok <user_query>, etc.)."""
+    if not s:
+        return s
+    m = re.search(r"<user_query>\s*(.*?)\s*</user_query>", s, re.S | re.I)
+    if m:
+        return m.group(1).strip()
+    # Drop leading system-reminder blocks for capture quality
+    s2 = re.sub(r"<system-reminder>[\s\S]*?</system-reminder>", "", s, flags=re.I)
+    s2 = re.sub(r"<user_info>[\s\S]*?</user_info>", "", s2, flags=re.I)
+    s2 = re.sub(r"<git_status>[\s\S]*?</git_status>", "", s2, flags=re.I)
+    s2 = re.sub(r"\s+", " ", s2).strip()
+    return s2 or s.strip()
+
+
 def emit_hook_context(text, event_name=None):
     """Write hook → model context. Claude Code injects plain stdout on SessionStart /
     UserPromptSubmit. Grok docs ignore passive stdout; it may honor Claude-compatible
@@ -439,13 +491,20 @@ def emit_hook_context(text, event_name=None):
     )
     # Detect Grok from envelope field names left in env by runner
     try:
-        # Side-channel for model-compliance fallback
-        sid = os.environ.get("GROK_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID") or ""
-        if sid and vault_ok():
+        # Side-channel for model-compliance fallback (every Grok session + latest pointer)
+        if vault_ok():
             inj = os.path.join(MEM, ".grok-inject")
             os.makedirs(inj, exist_ok=True)
-            safe = re.sub(r"[^A-Za-z0-9_-]", "_", sid)[:64] or "nosession"
-            atomic_write(os.path.join(inj, safe + ".md"), text)
+            sid = (
+                os.environ.get("GROK_SESSION_ID")
+                or os.environ.get("CLAUDE_SESSION_ID")
+                or ""
+            )
+            if sid:
+                safe = re.sub(r"[^A-Za-z0-9_-]", "_", sid)[:64] or "nosession"
+                atomic_write(os.path.join(inj, safe + ".md"), text)
+            # Always refresh latest so a new session can read "what just happened"
+            atomic_write(os.path.join(inj, "latest.md"), text)
     except Exception as e:
         log_err("emit_hook_context.sidechannel", e)
     try:
@@ -560,7 +619,7 @@ def scan_transcript(tpath, max_bytes=1048576):
         c = _content_blocks(o)
         if t == "user":
             if isinstance(c, str) and real_prompt(c.strip()):
-                last_user = c.strip()
+                last_user = extract_user_text(c.strip())
             elif isinstance(c, list):
                 for b in c:
                     if not isinstance(b, dict):
@@ -568,7 +627,7 @@ def scan_transcript(tpath, max_bytes=1048576):
                     if b.get("type") == "text" and real_prompt(
                         b.get("text", "").strip()
                     ):
-                        last_user = b["text"].strip()
+                        last_user = extract_user_text(b["text"].strip())
                     elif b.get("type") == "tool_result" and b.get("is_error"):
                         rc = b.get("content")
                         txt = (

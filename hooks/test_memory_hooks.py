@@ -337,5 +337,32 @@ def test_scan_transcript_grok_shape():
 
 
 
+
+
+def test_extract_user_text_user_query():
+    _bind()
+    raw = "<user_info>x</user_info>\n<user_query>\nship the fix\n</user_query>"
+    assert HL.extract_user_text(raw) == "ship the fix"
+
+
+def test_resolve_transcript_path_grok_session():
+    _bind()
+    import glob
+    base = os.path.expanduser("~/.grok/sessions")
+    hits = []
+    if os.path.isdir(base):
+        for root, dirs, files in os.walk(base):
+            if "chat_history.jsonl" in files:
+                hits.append(os.path.join(root, "chat_history.jsonl"))
+                if len(hits) >= 1:
+                    break
+    if not hits:
+        return
+    path = hits[0]
+    sid = os.path.basename(os.path.dirname(path))
+    got = HL.resolve_transcript_path({"sessionId": sid})
+    assert got == path
+
+
 if __name__ == "__main__":
     main()
