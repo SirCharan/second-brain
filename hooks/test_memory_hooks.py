@@ -283,5 +283,59 @@ def main():
     print(f"\n{passed}/{len(tests)} passed")
 
 
+def test_normalize_hook_camelcase():
+    _bind()
+    h = HL.normalize_hook(
+        {
+            "sessionId": "sid-1",
+            "transcriptPath": "/tmp/x.jsonl",
+            "stopHookActive": True,
+            "workspaceRoot": "/tmp/widgets",
+            "lastAssistantMessage": "hi",
+        }
+    )
+    assert h["session_id"] == "sid-1"
+    assert h["transcript_path"] == "/tmp/x.jsonl"
+    assert h["stop_hook_active"] is True
+    assert h["cwd"] == "/tmp/widgets"
+    assert h["last_assistant_message"] == "hi"
+
+
+def test_scan_transcript_grok_shape():
+    _bind()
+    import tempfile, json as _json
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    os.close(fd)
+    rows = [
+        {"type": "user", "content": [{"type": "text", "text": "fix the widgets router"}]},
+        {
+            "type": "assistant",
+            "content": "fixed <!--CAPTURE: widgets router || type: context || tags: #x || links: [[y]]-->",
+            "tool_calls": [
+                {
+                    "id": "1",
+                    "name": "search_replace",
+                    "arguments": _json.dumps({"file_path": "/tmp/widgets/a.py"}),
+                },
+                {
+                    "id": "2",
+                    "name": "run_terminal_command",
+                    "arguments": _json.dumps({"command": "pytest -q"}),
+                },
+            ],
+        },
+    ]
+    with open(path, "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(_json.dumps(r) + "\n")
+    scan = HL.scan_transcript(path)
+    os.unlink(path)
+    assert "widgets router" in (scan["last_user"] or "")
+    assert "CAPTURE" in (scan["last_asst"] or "")
+    assert "/tmp/widgets/a.py" in scan["files"]
+    assert any("pytest" in c for c in scan["commands"])
+
+
+
 if __name__ == "__main__":
     main()

@@ -259,14 +259,16 @@ def main():
     if not HL.vault_ok():
         return
     try:
-        hook = json.loads(sys.stdin.read())
+        hook = HL.normalize_hook(json.loads(sys.stdin.read()))
     except Exception:
         return
     if hook.get("stop_hook_active"):
         return
-    tpath = hook.get("transcript_path")
-    if not tpath or not os.path.exists(tpath):
+    # Grok also fires observe-only Stop at session end — skip non-turn completions.
+    reason = (hook.get("reason") or "").strip()
+    if reason in ("channel_closed", "shutdown"):
         return
+    tpath = hook.get("transcript_path")
     cwd = hook.get("cwd") or ""
     branch = hook.get("gitBranch") or ""
     # Route to the vault folder, not the raw cwd basename: a subdir like <repo>/web must
@@ -275,13 +277,24 @@ def main():
     proj, _proj_is_new = HL.route_project(cwd)
     proj = proj or ""
 
-    # 1MB tail + the shared parser: keeps the last genuine user/assistant pair even when
-    # a large tool result sits between them, filters harness-injected "user" messages,
-    # and extracts files/commands/errors for the session note.
-    scan = HL.scan_transcript(tpath, max_bytes=1_048_576)
+    # 1MB tail + shared parser (Claude JSONL or Grok chat_history.jsonl).
+    scan = {
+        "last_user": None,
+        "last_asst": None,
+        "files": [],
+        "commands": [],
+        "errors": [],
+    }
+    if tpath and os.path.exists(tpath):
+        scan = HL.scan_transcript(tpath, max_bytes=1_048_576)
     # redact high-confidence secret token shapes before any raw turn text hits disk
     last_user = HL.scrub_secrets(scan["last_user"])
     last_asst = HL.scrub_secrets(scan["last_asst"])
+    # Grok Stop carries lastAssistantMessage — use when transcript parse is empty
+    if not last_asst:
+        last_asst = HL.scrub_secrets(hook.get("last_assistant_message") or "") or None
+    if not last_user and not last_asst:
+        return
 
     captured_type = None
     m = re.search(r"<!--\s*CAPTURE:\s*(.*?)\s*-->", last_asst or "", re.S)

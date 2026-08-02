@@ -212,10 +212,11 @@ def _backlog_notice():
 def main():
     raw = sys.stdin.read()
     try:
-        hook = json.loads(raw)
+        hook = HL.normalize_hook(json.loads(raw))
     except Exception:
         hook = {}
-    if hook.get("source") not in ("startup", "clear"):
+    src = (hook.get("source") or "startup")
+    if src not in ("startup", "clear", "resume"):
         return
     if not HL.vault_ok():
         return
@@ -353,7 +354,7 @@ def main():
         payload = (
             _cap(payload, TOTAL_MAX, "resume lines") + "\n=== end Obsidian resume ==="
         )
-    sys.stdout.write(payload + "\n")
+    HL.emit_hook_context(payload + "\n")
 
     # Dedup handshake: tell memory-recall (UserPromptSubmit) what we already surfaced,
     # so the first prompts don't re-inject the same notes.

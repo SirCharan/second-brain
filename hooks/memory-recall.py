@@ -83,12 +83,12 @@ def _emit_note_debt():
     try:
         path = os.path.join(MEM, "_infra", "_note-debt.md")
         if not os.path.exists(path):
-            return
+            return None
         rows = [
             l.strip() for l in open(path, errors="ignore", encoding="utf-8") if l.startswith("- [ ] ")
         ]
         if not rows:
-            return
+            return None
         projs, oldest = [], None
         for r in rows:
             # search PAST the "- [ ] " checkbox, or the regex matches "[ ]" not "[proj]"
@@ -115,9 +115,10 @@ def _emit_note_debt():
             "(v2 frontmatter + H1 + status chip + callouts + `## Related` linking "
             "its `_MOC-` hub), then it clears itself. See `_infra/_note-debt.md`."
         )
-        sys.stdout.write(msg + "\n")
+        return msg
     except Exception as e:
         HL.log_err("memory-recall.note-debt", e)
+        return None
 
 
 def _emit_stats(proj):
@@ -133,9 +134,10 @@ def _emit_stats(proj):
         line = f"\U0001f4ca Obsidian memory: {total} notes{yclause}"
         if latest:
             line += f" · latest: {latest}"
-        sys.stdout.write(line + "\n")
+        return line
     except Exception as e:
         HL.log_err("memory-recall.stats", e)
+        return None
 
 
 VENV_PY = HL.EMBED_VENV_PY  # optional semantic-embed venv (built by `sb-embed setup`)
@@ -194,15 +196,22 @@ def main():
     if not HL.vault_ok():
         return
     try:
-        hook = json.loads(sys.stdin.read())
+        hook = HL.normalize_hook(json.loads(sys.stdin.read()))
     except Exception:
         return
     prompt = (hook.get("prompt") or "").strip()
     sid = hook.get("session_id") or "nosession"
     proj = project_for(hook.get("cwd", ""))
-    _emit_stats(proj)  # always-on memory stats line (before the gate)
-    _emit_note_debt()  # unpaid curated-note debt, if any
+    preamble = []
+    s = _emit_stats(proj)  # always-on memory stats line (before the gate)
+    if s:
+        preamble.append(s)
+    d = _emit_note_debt()  # unpaid curated-note debt, if any
+    if d:
+        preamble.append(d)
     if not prompt or TRIVIAL.match(prompt):
+        if preamble:
+            HL.emit_hook_context("\n".join(preamble) + "\n")
         return
     kw = {w for w in words(prompt) if w not in STOP}
     if len(kw) < 3:
@@ -229,6 +238,8 @@ def main():
             for (n, f, d) in _semantic_fill(prompt, exclude, need)
         ]
     if not fresh:
+        if preamble:
+            HL.emit_hook_context("\n".join(preamble) + "\n")
         return
 
     # Head-first injection: the TOP hit gets its full body (only when it respects the 8KB
@@ -269,7 +280,8 @@ def main():
     out.append(
         "(Open a note or `/second-brain find <term>` for more. Recalled once per session.)"
     )
-    sys.stdout.write("\n".join(out) + "\n")
+    parts = (preamble + out) if preamble else out
+    HL.emit_hook_context("\n".join(parts) + "\n")
 
     try:
         HL.write_json(
