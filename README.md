@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/SirCharan/second-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/SirCharan/second-brain/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.0-informational.svg)](CHANGELOG.md)
-[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey.svg)](#requirements)
+[![Version](https://img.shields.io/badge/version-0.6.0-informational.svg)](CHANGELOG.md)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)](#requirements)
 
 A file-based **second brain for [Claude Code](https://claude.com/claude-code)**. Hooks quietly
 capture every session into an Obsidian-compatible Markdown vault, recall the relevant notes into
@@ -72,8 +72,25 @@ facts are retired via `status: retired` + `supersedes`, so the whole vault is gi
 
 ## Requirements
 
-Claude Code, Python 3.8 or newer, and `bash`. macOS and Linux are tested in CI on every
-commit. Windows is not supported.
+Claude Code and Python 3.8 or newer. macOS, Linux and Windows are each tested in CI on every
+commit.
+
+The hooks are Python and are registered to run under your Python interpreter directly, so
+`bash` is not required. The `.sh` wrappers in `hooks/` are a convenience for running a hook by
+hand on macOS or Linux; nothing depends on them.
+
+**Windows.** Use `install.ps1` in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/SirCharan/second-brain/main/install.ps1 | iex
+```
+
+Two things differ. Semantic recall's setup script (`embed-setup.sh`) is bash, so that optional
+extra is macOS and Linux only — keyword recall, which is the default, works everywhere. And
+mirroring the vault into an existing Obsidian folder via `SECOND_BRAIN_OBSIDIAN_LINK` uses a
+directory junction rather than a symlink, because Windows refuses symlinks without Developer
+Mode; `doctor.py --fix` handles that automatically and warns rather than fails if both are
+blocked. WSL2 also works, using the normal `install.sh`.
 
 ## Install
 
@@ -91,7 +108,10 @@ captured without you doing anything.
 **What it touches.** Five paths, all recorded in `$CLAUDE_MEMORY_DIR/_infra/_install-manifest.json`:
 `~/.claude/hooks/`, `~/.claude/skills/second-brain/`, `~/.claude/workflows/vault-enrich.js`,
 your vault, and `~/.claude/settings.json` (backed up to `settings.json.bak` first). Existing
-hooks and settings are merged, never replaced. Re-run it any time to upgrade.
+hooks and settings are merged, never replaced. Re-run it any time to upgrade. Accepting the
+optional starter pack below adds skill directories under `~/.claude/skills/`, which are recorded
+in the same manifest. The pack's source is installed alongside the skill, so you can add another
+tier later without cloning the repo again.
 
 Prefer to read the script before running it? Clone and run it locally:
 
@@ -99,7 +119,38 @@ Prefer to read the script before running it? Clone and run it locally:
 git clone https://github.com/SirCharan/second-brain && ./second-brain/install.sh
 ```
 
-Useful flags: `--dry-run` (show what would happen), `--no-setup` (skip the wizard).
+Useful flags: `--dry-run` (show what would happen), `--no-setup` (skip the wizard),
+`--pack=core|core,writing|all|none` (answer the starter-pack question up front).
+
+### Starter pack (optional)
+
+A new vault is nearly empty. The graph is the reason to open it in Obsidian at all, and on day
+one it has about six nodes. The wizard offers a starter pack to fix that. Say no and nothing
+changes: the pack is not required for memory to work.
+
+| Tier | What you get |
+|---|---|
+| `core` | `gtan-workflow` (Garry Tan's GStack loop, bound to plans in your vault), `discovery` (interview before building), `working-with-claude`, `build-tdd`, `code-review-discipline`, plus the `vault-restructure` workflow |
+| `writing` | `writing-router`, `writing-composition`, `writing-eval`, `simplified-technical-english` |
+| `design` | `design-router`, `design-system`, `anti-slop-design-law`, `anti-slop-design-audit`, `layout-interaction-design`, `motion-3d`, `dataviz-design`, and the per-type recipes for reports, landing pages, docs sites and calculators |
+
+It also seeds a `_playbook/` folder with the working rules those skills assume, plus two note
+templates. An `.obsidian/` config sets graph colour groups per folder and a dark theme. Core
+Obsidian features only, no community plugins.
+
+```bash
+python3 ~/.claude/skills/second-brain/scripts/starter-pack.py --list          # see everything first
+python3 ~/.claude/skills/second-brain/scripts/starter-pack.py --tiers core    # install one tier
+```
+
+**Nothing is overwritten.** A skill directory, vault note or `.obsidian/` you already have is
+left exactly as it is, so the script is safe to re-run. Installed paths are recorded in the
+install manifest, so `uninstall.sh` removes them too.
+
+**Third-party packs are not redistributed.** Several of these skills route into work by other
+people — GStack, superpowers, ui-ux-pro-max, stop-slop and others. `starter-pack/manifest.json`
+lists each with its author, licence and install command, and the installer prints that list
+rather than vendoring anyone's code into this repo.
 
 ### Verify
 
@@ -115,6 +166,10 @@ It reports what is configured and prints the exact command for anything that is 
 bash uninstall.sh                 # removes the machinery, keeps every note
 bash uninstall.sh --purge-vault   # also deletes the vault (asks first)
 ```
+
+On Windows: `.\uninstall.ps1` and `.\uninstall.ps1 -PurgeVault`. Either way, removal is driven
+by the install manifest, so it takes out exactly what was installed — including any starter-pack
+skills — and nothing else.
 
 ### Alternative: Claude Code plugin
 

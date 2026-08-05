@@ -38,9 +38,17 @@ Hooks run on every prompt, so they must be invisible when healthy:
 
 - never raise — wrap and `log_err`
 - never block — warn and return, unless the hook is deliberately a permission gate
-- finish inside the timeout declared in `install.sh`; detach slow work
+- exit 0 whatever happens: hooks are registered as `"<python>" "<hook>.py"`, so nothing
+  absorbs a crash for you, and a non-zero `UserPromptSubmit` hook blocks the prompt
+- finish inside the timeout declared in `scripts/register-hooks.py`; detach slow work with
+  `HL.detach_kwargs()`, which picks the right per-platform flag
 - degrade to a no-op when the vault is absent (`vault_ok()`)
 - write atomically (`atomic_write`), because a reader may be mid-parse
+- stay portable: every hook must run on Windows too, so no bash, no POSIX-only Popen
+  arguments, and `os.sep`/`os.path.join` rather than hardcoded slashes
+
+A new hook needs an entry in `HOOKS` in `scripts/register-hooks.py` (one place, both
+installers) and a line in the CI step that runs every hook and expects exit 0.
 
 ## Note conventions
 

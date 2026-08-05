@@ -10,6 +10,38 @@ Stdlib-only. Never raises on a bad note."""
 
 import os, re, sys, glob
 
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 _HD = next(
     (
         p
@@ -48,7 +80,7 @@ def _arg(flag, default=None):
 
 def note_name(path):
     try:
-        raw = open(path, errors="ignore").read(600)
+        raw = open(path, errors="ignore", encoding="utf-8").read(600)
     except Exception:
         return None
     m = re.search(r"^name:\s*(.+)$", raw, re.M)
@@ -83,7 +115,7 @@ def main():
             continue
         labels[src] = src
         try:
-            body = open(path, errors="ignore").read()
+            body = open(path, errors="ignore", encoding="utf-8").read()
         except Exception:
             continue
         for tgt in re.findall(r"\[\[([^\]|#]+)", body):
@@ -111,7 +143,7 @@ def main():
     text = "\n".join(lines) + "\n"
 
     if out:
-        with open(out, "w") as f:
+        with open(out, "w", encoding="utf-8") as f:
             f.write(text)
         sys.stderr.write(
             f"graph → {out} ({len(kept)} nodes, {len(kept_edges)} edges)\n"

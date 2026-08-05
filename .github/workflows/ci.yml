@@ -49,6 +49,22 @@ jobs:
           HOME="$FAKE" CLAUDE_MEMORY_DIR="$VAULT" \
             python3 "$FAKE/.claude/skills/second-brain/scripts/doctor.py" --strict
 
+      # Hooks are registered as "<python> <hook>.py" rather than via the .sh wrappers,
+      # so the wrappers no longer absorb a crash. Every hook must exit 0 on its own:
+      # a non-zero UserPromptSubmit hook blocks the prompt.
+      - name: Every hook must run and exit 0
+        run: |
+          set -euo pipefail
+          FAKE="$RUNNER_TEMP/fakehome"
+          VAULT="$FAKE/.claude/second-brain-vault"
+          for h in session-memory session-resume memory-recall context-monitor \
+                   interview-nudge memory-lint stuck-detector capture-exchange \
+                   precompact-carryover; do
+            printf '%s' '{"source":"startup","prompt":"ci smoke","cwd":"."}' \
+              | HOME="$FAKE" CLAUDE_MEMORY_DIR="$VAULT" python3 "$FAKE/.claude/hooks/$h.py" >/dev/null
+            echo "  ok $h"
+          done
+
       - name: Setup wizard must not hang without a TTY
         run: |
           set -euo pipefail
@@ -69,19 +85,142 @@ jobs:
           echo "$out" | grep -q "broken wikilinks: 0"
           echo "$out" | grep -q "orphans (no outbound links): 0"
 
+      # The pack is opt-in, so the default install must not have pulled it in, and an
+      # explicit --pack=all must land every tier plus the vault content.
+      - name: Starter pack installs on request and not by default
+        run: |
+          set -euo pipefail
+          FAKE="$RUNNER_TEMP/fakehome"
+          VAULT="$FAKE/.claude/second-brain-vault"
+          test ! -d "$FAKE/.claude/skills/gtan-workflow"   # --no-setup declined it
+          HOME="$FAKE" CLAUDE_MEMORY_DIR="$VAULT" bash install.sh --no-setup --pack=all
+          test -d "$FAKE/.claude/skills/gtan-workflow"
+          test -d "$FAKE/.claude/skills/design-router"
+          test -f "$FAKE/.claude/workflows/vault-restructure.js"
+          test -f "$VAULT/_playbook/session-habits.md"
+          test -f "$VAULT/.obsidian/graph.json"
+          test -f "$VAULT/_system/skills/skill-gtan-workflow.md"
+          grep -q '_MOC-playbook' "$VAULT/_Home.md"
+          # the seeded notes must not introduce broken links or orphans
+          out="$(CLAUDE_MEMORY_DIR="$VAULT" python3 skills/second-brain/scripts/health.py)"
+          echo "$out" | grep -q "broken wikilinks: 0"
+          echo "$out" | grep -q "orphans (no outbound links): 0"
+          # a second run must change nothing
+          HOME="$FAKE" CLAUDE_MEMORY_DIR="$VAULT" \
+            python3 "$FAKE/.claude/skills/second-brain/scripts/starter-pack.py" --tiers all \
+            | grep -q '0 skill(s)'
+          HOME="$FAKE" CLAUDE_MEMORY_DIR="$VAULT" \
+            python3 "$FAKE/.claude/skills/second-brain/scripts/doctor.py" --strict
+
       - name: Uninstall must leave the vault and restore settings
         run: |
           set -euo pipefail
           FAKE="$RUNNER_TEMP/fakehome"
           HOME="$FAKE" bash uninstall.sh
           test ! -d "$FAKE/.claude/skills/second-brain"
+          test ! -d "$FAKE/.claude/skills/gtan-workflow"        # starter pack goes too
+          test ! -f "$FAKE/.claude/workflows/vault-restructure.js"
           test -f "$FAKE/.claude/second-brain-vault/_Home.md"   # notes survive
+          test -f "$FAKE/.claude/second-brain-vault/_playbook/session-habits.md"
           python3 - "$FAKE/.claude/settings.json" <<'PY'
           import json, sys
           d = json.load(open(sys.argv[1]))
           assert not d.get("hooks"), "hooks should be de-registered: %r" % (d.get("hooks"),)
           print("settings.json clean")
           PY
+
+  # Native Windows: no bash, no /usr/bin/python3, no symlink privilege. This job is the
+  # only proof the PowerShell installer and the python-direct hook registrations work
+  # there, so "Windows is supported" in the README depends on it staying green.
+  install-smoke-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install into a throwaway config dir
+        shell: pwsh
+        run: |
+          $fake = Join-Path $env:RUNNER_TEMP "fake"
+          New-Item -ItemType Directory -Force -Path $fake | Out-Null
+          $env:CLAUDE_CONFIG_DIR = Join-Path $fake ".claude"
+          $env:CLAUDE_MEMORY_DIR = Join-Path $fake "vault"
+          .\install.ps1 -NoSetup -Pack all
+          # the machinery landed
+          if (-not (Test-Path (Join-Path $env:CLAUDE_CONFIG_DIR "hooks\_hooklib.py"))) { throw "hooks missing" }
+          if (-not (Test-Path (Join-Path $env:CLAUDE_CONFIG_DIR "hooks\session-memory.py"))) { throw "session-memory.py missing" }
+          if (-not (Test-Path (Join-Path $env:CLAUDE_MEMORY_DIR "_Home.md"))) { throw "vault missing" }
+          if (-not (Test-Path (Join-Path $env:CLAUDE_MEMORY_DIR "_infra\_install-manifest.json"))) { throw "manifest missing" }
+          # the starter pack landed
+          if (-not (Test-Path (Join-Path $env:CLAUDE_CONFIG_DIR "skills\gtan-workflow"))) { throw "pack missing" }
+          if (-not (Test-Path (Join-Path $env:CLAUDE_MEMORY_DIR ".obsidian\graph.json"))) { throw "obsidian config missing" }
+          # the test suite must not ship into the user's hooks dir
+          if (Get-ChildItem (Join-Path $env:CLAUDE_CONFIG_DIR "hooks") -Filter "test_*") { throw "tests shipped" }
+
+      - name: Registrations must name a real interpreter, not bash
+        shell: pwsh
+        run: |
+          $fake = Join-Path $env:RUNNER_TEMP "fake"
+          $settings = Join-Path $fake ".claude\settings.json"
+          $cmds = (Get-Content $settings -Raw | ConvertFrom-Json).hooks.PSObject.Properties.Value |
+                  ForEach-Object { $_.hooks } | ForEach-Object { $_.command }
+          if ($cmds | Where-Object { $_ -match 'bash ' }) { throw "a hook still shells out to bash" }
+          if (-not ($cmds | Where-Object { $_ -match 'session-memory\.py' })) { throw "session-memory not registered" }
+          $cmds | ForEach-Object { Write-Host $_ }
+
+      - name: Every hook must run and exit 0
+        shell: pwsh
+        run: |
+          $fake = Join-Path $env:RUNNER_TEMP "fake"
+          $env:CLAUDE_MEMORY_DIR = Join-Path $fake "vault"
+          $hooks = Join-Path $fake ".claude\hooks"
+          $payload = '{"source":"startup","prompt":"windows smoke test","cwd":"."}'
+          foreach ($h in @("session-memory", "session-resume", "memory-recall", "context-monitor",
+                           "interview-nudge", "memory-lint", "stuck-detector", "capture-exchange",
+                           "precompact-carryover")) {
+            $payload | python (Join-Path $hooks "$h.py") | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "$h exited $LASTEXITCODE" }
+            Write-Host "  ok $h"
+          }
+
+      - name: Doctor must pass
+        shell: pwsh
+        run: |
+          $fake = Join-Path $env:RUNNER_TEMP "fake"
+          $env:CLAUDE_CONFIG_DIR = Join-Path $fake ".claude"
+          $env:CLAUDE_MEMORY_DIR = Join-Path $fake "vault"
+          $cfg = Join-Path $env:CLAUDE_MEMORY_DIR "config.json"
+          $c = Get-Content $cfg -Raw | ConvertFrom-Json
+          $c.PSObject.Properties.Remove("_comment")
+          $c | Add-Member -NotePropertyName project_map -NotePropertyValue @{ demo = "demo" } -Force
+          $c | ConvertTo-Json -Depth 9 | Set-Content $cfg
+          python (Join-Path $env:CLAUDE_CONFIG_DIR "skills\second-brain\scripts\doctor.py") --strict
+
+      - name: Starter pack + hook tests
+        shell: pwsh
+        run: |
+          python tests\test_starter_pack.py
+          python tests\test_portability.py
+          Get-ChildItem hooks -Filter "test_*.py" | ForEach-Object {
+            Write-Host "== $($_.Name) =="
+            python $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "$($_.Name) failed" }
+          }
+
+      - name: Uninstall must leave the vault
+        shell: pwsh
+        run: |
+          $fake = Join-Path $env:RUNNER_TEMP "fake"
+          $env:CLAUDE_CONFIG_DIR = Join-Path $fake ".claude"
+          $env:CLAUDE_MEMORY_DIR = Join-Path $fake "vault"
+          .\uninstall.ps1
+          if (Test-Path (Join-Path $env:CLAUDE_CONFIG_DIR "skills\second-brain")) { throw "skill survived" }
+          if (Test-Path (Join-Path $env:CLAUDE_CONFIG_DIR "skills\gtan-workflow")) { throw "pack survived" }
+          if (-not (Test-Path (Join-Path $env:CLAUDE_MEMORY_DIR "_Home.md"))) { throw "notes were deleted" }
+          $d = Get-Content (Join-Path $env:CLAUDE_CONFIG_DIR "settings.json") -Raw | ConvertFrom-Json
+          if ($d.hooks) { throw "hooks still registered" }
 
   test:
     runs-on: ubuntu-latest
@@ -108,6 +247,12 @@ jobs:
             echo "== $t =="
             python3 "$t"
           done
+
+      - name: Starter pack tests
+        run: python3 tests/test_starter_pack.py
+
+      - name: Portability tests
+        run: python3 tests/test_portability.py
 
       - name: MCP test
         run: python3 mcp/test_mcp.py

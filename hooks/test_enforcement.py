@@ -15,7 +15,7 @@ sys.path.insert(0, HOOKS)
 _VAULT = tempfile.mkdtemp(prefix="enf-test-vault-")
 for _d in ("Daily", "Sessions", "_infra"):
     os.makedirs(os.path.join(_VAULT, _d), exist_ok=True)
-with open(os.path.join(_VAULT, "config.json"), "w") as _f:
+with open(os.path.join(_VAULT, "config.json"), "w", encoding="utf-8") as _f:
     json.dump({"project_map": {"widgets": "widgets"}}, _f)
 os.environ["CLAUDE_MEMORY_DIR"] = _VAULT
 
@@ -60,7 +60,7 @@ def test_route_known_project_does_not_reregister():
     _bind()
     folder, is_new = HL.route_project("/x/y/widgets")
     assert folder == "widgets" and is_new is False
-    cfg = json.load(open(os.path.join(_VAULT, "config.json")))
+    cfg = json.load(open(os.path.join(_VAULT, "config.json"), encoding="utf-8"))
     assert list(cfg["project_map"]) == ["widgets"], "known repo must not add an entry"
 
 
@@ -73,10 +73,10 @@ def test_route_unknown_repo_registers_and_scaffolds():
     assert os.path.isdir(os.path.join(_VAULT, folder)), "project folder not created"
     hub = os.path.join(_VAULT, folder, HL.moc_name(folder) + ".md")
     assert os.path.exists(hub), "hub not created"
-    t = open(hub).read()
+    t = open(hub, encoding="utf-8").read()
     for req in ("name:", "status:", "# ", "## Related", "[[_Home]]"):
         assert req in t, f"hub missing {req!r}"
-    cfg = json.load(open(os.path.join(_VAULT, "config.json")))
+    cfg = json.load(open(os.path.join(_VAULT, "config.json"), encoding="utf-8"))
     assert cfg["project_map"][base] == folder, "config.json not updated"
 
 
@@ -84,9 +84,9 @@ def test_scaffold_is_idempotent():
     _bind()
     HL.ensure_project_scaffold("widgets")
     hub = os.path.join(_VAULT, "widgets", "_MOC-widgets.md")
-    open(hub, "a").write("\nhand-edited marker\n")
+    open(hub, "a", encoding="utf-8").write("\nhand-edited marker\n")
     assert HL.ensure_project_scaffold("widgets") is False, "must not recreate"
-    assert "hand-edited marker" in open(hub).read(), "clobbered an existing hub"
+    assert "hand-edited marker" in open(hub, encoding="utf-8").read(), "clobbered an existing hub"
 
 
 def test_route_refuses_non_project_dirs():
@@ -107,7 +107,7 @@ def _transcript(tool_files, text="done"):
         {"type": "user", "message": {"role": "user", "content": "do the thing"}},
         {"type": "assistant", "message": {"content": blocks}},
     ]
-    open(tp, "w").write("\n".join(json.dumps(t) for t in turns) + "\n")
+    open(tp, "w", encoding="utf-8").write("\n".join(json.dumps(t) for t in turns) + "\n")
     return tp
 
 
@@ -123,18 +123,18 @@ def test_note_debt_raised_then_cleared():
         {"transcript_path": tp, "cwd": "/x/y/widgets", "session_id": "debtsid1"},
     )
     assert rc == 0, err
-    assert "debtsid1"[:8] in open(debt).read(), "debt not recorded"
+    assert "debtsid1"[:8] in open(debt, encoding="utf-8").read(), "debt not recorded"
 
     # a curated note lands in the folder -> debt clears
     note = os.path.join(_VAULT, "widgets", "widgets-thing.md")
-    open(note, "w").write("---\nname: widgets-thing\nstatus: active\n---\n# T\n")
+    open(note, "w", encoding="utf-8").write("---\nname: widgets-thing\nstatus: active\n---\n# T\n")
     tp2 = _transcript([note])
     rc, _, err = _run(
         "capture-exchange.py",
         {"transcript_path": tp2, "cwd": "/x/y/widgets", "session_id": "debtsid1"},
     )
     assert rc == 0, err
-    open_rows = [l for l in open(debt) if l.startswith("- [ ] ")]
+    open_rows = [l for l in open(debt, encoding="utf-8") if l.startswith("- [ ] ")]
     assert not open_rows, f"debt should be cleared, still: {open_rows}"
 
 
@@ -143,14 +143,14 @@ def test_no_debt_when_only_vault_touched():
     HL.ensure_project_scaffold("widgets")  # order-independent
     debt = os.path.join(_VAULT, "_infra", "_note-debt.md")
     note = os.path.join(_VAULT, "widgets", "widgets-only.md")
-    open(note, "w").write("---\nname: widgets-only\nstatus: active\n---\n# T\n")
+    open(note, "w", encoding="utf-8").write("---\nname: widgets-only\nstatus: active\n---\n# T\n")
     tp = _transcript([note])
     _run(
         "capture-exchange.py",
         {"transcript_path": tp, "cwd": "/x/y/widgets", "session_id": "vaultonly"},
     )
     # the file may legitimately not exist yet — a vault with no debt writes none
-    have = open(debt).read() if os.path.exists(debt) else ""
+    have = open(debt, encoding="utf-8").read() if os.path.exists(debt) else ""
     assert "vaultonly" not in have, "note-only session owes nothing"
 
 

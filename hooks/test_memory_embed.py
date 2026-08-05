@@ -34,16 +34,21 @@ def test_cosine():
 
 
 def test_is_note():
-    assert E.is_note("/m/widgets/widgets-v32.md")
-    assert not E.is_note("/m/widgets/_MOC-widgets.md")  # underscore
-    assert not E.is_note("/m/Daily/2026-07-17.md")  # journal
-    assert not E.is_note("/m/x/MEMORY.md")  # excluded index
+    # Build under the module's own MEM: a POSIX-style literal makes ntpath.relpath
+    # raise on Windows, because the path and MEM sit on different drives.
+    def under(*parts):
+        return os.path.join(E.MEM, *parts)
+
+    assert E.is_note(under("widgets", "widgets-v32.md"))
+    assert not E.is_note(under("widgets", "_MOC-widgets.md"))  # underscore
+    assert not E.is_note(under("Daily", "2026-07-17.md"))  # journal
+    assert not E.is_note(under("x", "MEMORY.md"))  # excluded index
 
 
 def test_note_text_strips_frontmatter():
     d = tempfile.mkdtemp()
     p = os.path.join(d, "widgets-expiry-leak.md")
-    open(p, "w").write(
+    open(p, "w", encoding="utf-8").write(
         '---\nname: x\ndescription: "the expiry leak note"\ntags: [signals]\n---\n'
         "Body about ATR brackets and expiry.\n"
     )

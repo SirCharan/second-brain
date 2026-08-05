@@ -14,12 +14,46 @@ equivalent and exits 0, so an install never hangs waiting for input.
 Flags:
   --non-interactive   print the manual steps and exit, even with a TTY
   --vault PATH        operate on this vault instead of $CLAUDE_MEMORY_DIR
+  --pack SPEC         install the starter pack without asking: none, core,
+                      "core,writing", or all. install.sh passes this through.
 """
 
 import json
 import os
 import subprocess
 import sys
+
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 MEM = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.expanduser(
     "~/.claude/second-brain-vault"
@@ -38,6 +72,14 @@ SKIP_NAMES = {
     ".claude",
 }
 MAX_REPOS = 40
+
+# Starter-pack menu. Index -> the --tiers value handed to starter-pack.py.
+PACK_CHOICES = {
+    "1": ("", "none"),
+    "2": ("core", "core — process discipline + the vault workflow"),
+    "3": ("core,writing", "core + writing — prose routing and the pre-ship grade"),
+    "4": ("core,writing,design", "core + writing + design — everything, 22 skills"),
+}
 
 
 def _c(code, s):
@@ -82,7 +124,7 @@ def find_repos():
 def load_config(vault):
     p = os.path.join(vault, "config.json")
     try:
-        with open(p) as f:
+        with open(p, encoding="utf-8") as f:
             cfg = json.load(f)
             return cfg if isinstance(cfg, dict) else {}
     except (OSError, ValueError):
@@ -93,7 +135,7 @@ def save_config(vault, cfg):
     p = os.path.join(vault, "config.json")
     os.makedirs(vault, exist_ok=True)
     tmp = p + ".tmp"
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
         f.write("\n")
     os.replace(tmp, p)
@@ -145,7 +187,30 @@ directory name to a vault folder:
 Both entries point at one folder, so a repo and its web front-end share memory.
 Then check the install:
     python3 ~/.claude/skills/second-brain/scripts/doctor.py
+
+The optional starter pack (skills + vault notes + an Obsidian config) installs with:
+    python3 ~/.claude/skills/second-brain/scripts/starter-pack.py --list
+    python3 ~/.claude/skills/second-brain/scripts/starter-pack.py --tiers core
 """)
+
+
+def run_starter_pack(vault, tiers):
+    """Hand the selection to starter-pack.py. Never fails setup: the pack is optional."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "starter-pack.py")
+    if not tiers or not os.path.exists(script):
+        return
+    env = dict(os.environ, CLAUDE_MEMORY_DIR=vault)
+    try:
+        subprocess.run(
+            [sys.executable, "-X", "utf8", script, "--tiers", tiers],
+            env=env,
+            check=False,
+            timeout=300,
+        )
+    except Exception as e:  # noqa: BLE001 — an optional extra must not break setup
+        print(
+            f"   ! starter pack skipped ({e}). Re-run: python3 {script} --tiers {tiers}"
+        )
 
 
 def ask(prompt, default=""):
@@ -165,9 +230,22 @@ def main():
         if i + 1 < len(args):
             vault = os.path.expanduser(args[i + 1])
 
+    # --pack answers the starter-pack question up front, so an install with no TTY can
+    # still request it. "none" (or the flag being absent) means do not ask, do not install.
+    pack = None
+    for i, a in enumerate(args):
+        if a == "--pack" and i + 1 < len(args):
+            pack = args[i + 1]
+        elif a.startswith("--pack="):
+            pack = a.split("=", 1)[1]
+    if pack is not None:
+        pack = "" if pack.strip().lower() in ("", "none", "no", "n") else pack.strip()
+
     interactive = sys.stdin.isatty() and "--non-interactive" not in args
     if not interactive:
         manual_steps(vault)
+        if pack:
+            run_starter_pack(vault, pack)
         return 0
 
     print(
@@ -228,7 +306,21 @@ def main():
     except (EOFError, KeyboardInterrupt):
         pass
 
-    # --- 3. write -----------------------------------------------------------
+    # --- 3. starter pack ----------------------------------------------------
+    if pack is None:
+        print(f"\n{bold('3. Starter pack?')}")
+        print(dim("   Skills and vault notes, so the graph is not empty on day one."))
+        print(
+            dim("   Everything is optional and nothing already on disk is overwritten.")
+        )
+        for key in sorted(PACK_CHOICES):
+            print(f"   [{key}] {PACK_CHOICES[key][1]}")
+        try:
+            pack = PACK_CHOICES.get(ask("   > ", "1"), ("", ""))[0]
+        except (EOFError, KeyboardInterrupt):
+            pack = ""
+
+    # --- 4. write -----------------------------------------------------------
     cfg["project_map"] = pmap
     cfg.setdefault("project_prefixes", {})
     os.makedirs(os.path.join(vault, ".recall-state"), exist_ok=True)
@@ -248,12 +340,16 @@ def main():
         else:
             print(f"   ! embed-setup.sh not found next to this script; skipped.")
 
-    # --- 4. verify ----------------------------------------------------------
+    if pack:
+        print()
+        run_starter_pack(vault, pack)
+
+    # --- 5. verify ----------------------------------------------------------
     doctor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "doctor.py")
     if os.path.exists(doctor):
-        print(f"\n{bold('3. Checking the install')}")
+        print(f"\n{bold('4. Checking the install')}")
         env = dict(os.environ, CLAUDE_MEMORY_DIR=vault)
-        subprocess.run([sys.executable, doctor], env=env, check=False)
+        subprocess.run([sys.executable, "-X", "utf8", doctor], env=env, check=False)
 
     print(f"""
 {bold("Done.")} Restart Claude Code so the hooks load, then just work normally —
@@ -262,6 +358,7 @@ sessions are captured automatically.
   Ask it something and watch the memory banner appear.
   Curate a note:   /second-brain capture "<fact>"
   Search:          /second-brain pull "<terms>"
+  Starter pack:    python3 {os.path.join(os.path.dirname(os.path.abspath(__file__)), "starter-pack.py")} --list
   Re-run setup:    python3 {os.path.abspath(__file__)}
 """)
     return 0

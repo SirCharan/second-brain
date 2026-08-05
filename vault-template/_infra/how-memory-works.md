@@ -44,6 +44,16 @@ The **journal** (`Daily/`, `Sessions/`) is automatic and complete. It records ev
 > [!warning] Skip it for long enough and recall goes quiet
 > `Daily/` and `Sessions/` grow forever and recall deliberately ignores both — it ranks curated notes only. A vault that is never consolidated keeps capturing perfectly and retrieves nothing, while still reporting a healthy note count.
 
+## Opening this in Obsidian
+
+Two ways, and they differ in one way that matters:
+
+- **Open this folder as its own vault.** Obsidian reads the `.obsidian/` directory inside it. If you installed the starter pack, that directory already holds graph colour groups per folder, a dark theme, and the `_templates` folder wiring.
+- **Symlink this folder inside an existing vault** by setting `SECOND_BRAIN_OBSIDIAN_LINK` to the target path, then running `doctor.py --fix` to create and maintain the link. Obsidian then uses the *parent* vault's configuration, and the `.obsidian/` directory here is ignored.
+
+> [!info] No plugins, either way
+> The graph, backlinks, search, tags and templates are all core Obsidian features. Nothing here needs a community plugin, and no plugin runs as part of the memory loop.
+
 ## Keep notes small
 
 > [!warning] 4 KB target, 8 KB hard limit

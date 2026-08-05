@@ -45,7 +45,7 @@ def test_session_note_accumulates_and_dedups_links():
         )
         path = os.path.join(tmp, "Sessions", "2026-07-17__sid12345.md")
         assert os.path.exists(path), "session note not written"
-        txt = open(path).read()
+        txt = open(path, encoding="utf-8").read()
         # both turns logged
         assert "did thing one" in txt and "did thing two" in txt
         # links deduped: note-b appears once, all three present
@@ -71,7 +71,7 @@ def test_session_note_no_links():
             datetime(2026, 7, 17, 9, 0), "abc", "", "", "(raw) something", []
         )
         path = os.path.join(tmp, "Sessions", "2026-07-17__abc.md")
-        txt = open(path).read()
+        txt = open(path, encoding="utf-8").read()
         assert "(no linked notes yet)" in txt
         assert "(no project)" in txt
         print("  ok  test_session_note_no_links")

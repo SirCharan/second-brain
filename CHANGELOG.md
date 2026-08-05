@@ -2,6 +2,55 @@
 
 Notable changes per release. The current version lives in [`VERSION`](VERSION).
 
+## 0.6.0
+
+### Windows
+
+Windows was unsupported for four specific reasons, all now fixed. WSL2 always worked because
+it is Linux; this is native PowerShell.
+
+- Hooks are registered as `"<python>" "<hook>.py"` instead of `bash "<hook>.sh"`. The wrappers
+  only ever pinned an interpreter and swallowed errors, and every hook `.py` already catches
+  everything and exits 0 — which matters because a non-zero `UserPromptSubmit` hook blocks the
+  prompt. The `.sh` files remain in the repo for running a hook by hand. Registration still
+  prefers `/usr/bin/python3` over a pyenv shim, which is what the wrappers were protecting.
+- `session-memory` had no Python twin. It does now (`hooks/session-memory.py`), so no hook
+  needs a shell.
+- `install.ps1` and `uninstall.ps1` are first-class equivalents of the shell scripts. Hook
+  registration and the manifest moved into `scripts/register-hooks.py`, which both installers
+  call, so the two cannot drift. The Windows interpreter probe tries `py -3` and `python`
+  before `python3`, which is the Microsoft Store stub.
+- `doctor.py` tries a symlink, falls back to a directory junction (no Developer Mode needed),
+  and warns instead of failing if both are refused. It also honours `CLAUDE_CONFIG_DIR`, and no
+  longer demands the `.sh` wrappers or an executable bit on Windows.
+- The embed venv path (`Scripts\python.exe` vs `bin/python`) and the background-refresh launch
+  flags (`start_new_session` is POSIX-only) are now per-platform.
+- CI gained a `windows-latest` job that installs via `install.ps1`, asserts no registration
+  shells out to bash, runs all nine hooks expecting exit 0, gates on `doctor --strict`, and
+  uninstalls. Semantic recall stays macOS and Linux only: its setup script is bash.
+
+### Starter pack (opt-in)
+
+A fresh vault held six notes and no Obsidian configuration, so the graph looked dead on the
+day you installed it. None of the working discipline the skills assume came with it either.
+
+- `starter-pack/` ships 22 skills across three tiers (`core`, `writing`, `design`), a
+  `_playbook/` folder of working rules, two note templates, and an `.obsidian/` config with
+  per-folder graph colour groups. Core Obsidian features only — no community plugins.
+- Offered as step 3 of the setup wizard, and available any time via
+  `scripts/starter-pack.py --list` / `--tiers core,writing`. `install.sh --pack=…` answers the
+  question up front for a non-interactive install.
+- Nothing is overwritten. An existing skill directory, vault note or `.obsidian/` is left
+  exactly as it is, which makes the script safe to re-run.
+- Installed paths are appended to the install manifest, so `uninstall.sh` removes them with
+  no change on its side.
+- Third-party packs are referenced, never redistributed: `starter-pack/manifest.json` records
+  each one's author, licence, install command and which bundled skill needs it. Every source
+  was checked against a live upstream; one skill whose upstream could not be verified is
+  listed as unbundled rather than shipped with a guessed URL.
+- `build-system-index.py` now honours `CLAUDE_CONFIG_DIR`, so it indexes the right skills
+  directory and writes real paths into the `_system/` notes.
+
 ## 0.5.0
 
 ### Install and setup

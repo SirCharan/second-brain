@@ -10,7 +10,7 @@ import os, sys, json, subprocess, tempfile, importlib.util
 _VAULT = tempfile.mkdtemp(prefix="sb-test-vault-")
 for _d in ("Daily", "Sessions", "_infra"):
     os.makedirs(os.path.join(_VAULT, _d), exist_ok=True)
-with open(os.path.join(_VAULT, "config.json"), "w") as _f:
+with open(os.path.join(_VAULT, "config.json"), "w", encoding="utf-8") as _f:
     json.dump(
         {
             "project_map": {"widgets": "widgets", "acme-web": "acme"},
@@ -18,7 +18,7 @@ with open(os.path.join(_VAULT, "config.json"), "w") as _f:
         },
         _f,
     )
-with open(os.path.join(_VAULT, "MEMORY.md"), "w") as _f:
+with open(os.path.join(_VAULT, "MEMORY.md"), "w", encoding="utf-8") as _f:
     _f.write("# MEMORY\n")
 os.environ["CLAUDE_MEMORY_DIR"] = _VAULT
 
@@ -151,7 +151,7 @@ def test_backlog_notice_thresholds():
 
     def write(n, age_days):
         day = (today - __import__("datetime").timedelta(days=age_days)).isoformat()
-        with open(q, "w") as f:
+        with open(q, "w", encoding="utf-8") as f:
             f.write("# Promote queue\n\n")
             for i in range(n):
                 f.write("- [ ] %s 10:0%d — finding %d\n" % (day, i % 10, i))
@@ -178,7 +178,7 @@ def test_backlog_notice_thresholds():
     assert "📥" in sr._backlog_notice()
 
     # a fully checked-off queue is clean, and a missing file is not an error
-    with open(q, "w") as f:
+    with open(q, "w", encoding="utf-8") as f:
         f.write("# Promote queue\n\n- [x] %s — done\n" % today.isoformat())
     assert sr._backlog_notice() is None, "checked-off items are not a backlog"
     os.remove(q)
@@ -193,7 +193,7 @@ def test_backlog_notice_survives_truncation():
     sr = session_resume
     today = __import__("datetime").date.today().isoformat()
     os.makedirs(os.path.join(_VAULT, "_infra"), exist_ok=True)
-    with open(os.path.join(_VAULT, "_infra", "_promote-queue.md"), "w") as f:
+    with open(os.path.join(_VAULT, "_infra", "_promote-queue.md"), "w", encoding="utf-8") as f:
         f.write("# Promote queue\n\n")
         for i in range(sr.BACKLOG_LOUD + 5):
             f.write("- [ ] %s 10:00 — finding %d\n" % (today, i))
@@ -281,6 +281,87 @@ def main():
         print(f"  ok  {t.__name__}")
         passed += 1
     print(f"\n{passed}/{len(tests)} passed")
+
+
+def test_normalize_hook_camelcase():
+    _bind()
+    h = HL.normalize_hook(
+        {
+            "sessionId": "sid-1",
+            "transcriptPath": "/tmp/x.jsonl",
+            "stopHookActive": True,
+            "workspaceRoot": "/tmp/widgets",
+            "lastAssistantMessage": "hi",
+        }
+    )
+    assert h["session_id"] == "sid-1"
+    assert h["transcript_path"] == "/tmp/x.jsonl"
+    assert h["stop_hook_active"] is True
+    assert h["cwd"] == "/tmp/widgets"
+    assert h["last_assistant_message"] == "hi"
+
+
+def test_scan_transcript_grok_shape():
+    _bind()
+    import tempfile, json as _json
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    os.close(fd)
+    rows = [
+        {"type": "user", "content": [{"type": "text", "text": "fix the widgets router"}]},
+        {
+            "type": "assistant",
+            "content": "fixed <!--CAPTURE: widgets router || type: context || tags: #x || links: [[y]]-->",
+            "tool_calls": [
+                {
+                    "id": "1",
+                    "name": "search_replace",
+                    "arguments": _json.dumps({"file_path": "/tmp/widgets/a.py"}),
+                },
+                {
+                    "id": "2",
+                    "name": "run_terminal_command",
+                    "arguments": _json.dumps({"command": "pytest -q"}),
+                },
+            ],
+        },
+    ]
+    with open(path, "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(_json.dumps(r) + "\n")
+    scan = HL.scan_transcript(path)
+    os.unlink(path)
+    assert "widgets router" in (scan["last_user"] or "")
+    assert "CAPTURE" in (scan["last_asst"] or "")
+    assert "/tmp/widgets/a.py" in scan["files"]
+    assert any("pytest" in c for c in scan["commands"])
+
+
+
+
+
+def test_extract_user_text_user_query():
+    _bind()
+    raw = "<user_info>x</user_info>\n<user_query>\nship the fix\n</user_query>"
+    assert HL.extract_user_text(raw) == "ship the fix"
+
+
+def test_resolve_transcript_path_grok_session():
+    _bind()
+    import glob
+    base = os.path.expanduser("~/.grok/sessions")
+    hits = []
+    if os.path.isdir(base):
+        for root, dirs, files in os.walk(base):
+            if "chat_history.jsonl" in files:
+                hits.append(os.path.join(root, "chat_history.jsonl"))
+                if len(hits) >= 1:
+                    break
+    if not hits:
+        return
+    path = hits[0]
+    sid = os.path.basename(os.path.dirname(path))
+    got = HL.resolve_transcript_path({"sessionId": sid})
+    assert got == path
 
 
 if __name__ == "__main__":

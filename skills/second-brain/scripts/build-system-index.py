@@ -4,6 +4,38 @@ _MOC-system) and _projects.md + per-MOC Links blocks. Idempotent. Local vault on
 
 import os, re, glob, shutil, sys
 
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 _here = os.path.dirname(os.path.abspath(__file__))
 _HD = next(
     (
@@ -34,20 +66,25 @@ except Exception:
     )
     CONFIG = {}
 HOME = os.path.expanduser("~")
-SKILLS_DIR = os.path.join(HOME, ".claude/skills")
-CMDS_DIR = os.path.join(HOME, ".claude/commands")
-HOOKS_DIR = os.path.join(HOME, ".claude/hooks")
-CLAUDE_MD = os.path.join(HOME, ".claude/CLAUDE.md")
+# Honour CLAUDE_CONFIG_DIR like the rest of the codebase: a non-default config dir
+# otherwise indexes the wrong machine's skills (or none at all).
+CLAUDE_DIR = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(HOME, ".claude")
+SKILLS_DIR = os.path.join(CLAUDE_DIR, "skills")
+CMDS_DIR = os.path.join(CLAUDE_DIR, "commands")
+HOOKS_DIR = os.path.join(CLAUDE_DIR, "hooks")
+CLAUDE_MD = os.path.join(CLAUDE_DIR, "CLAUDE.md")
 SYS = os.path.join(MEM, "_system")
 
 
 def w(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    open(path, "w").write(text)
+    # explicit encoding: the notes carry emoji and a Windows default of cp1252 raises
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
 
 
 def fm_desc(p):
-    t = open(p, errors="ignore").read()
+    t = open(p, encoding="utf-8", errors="ignore").read()
     m = re.search(r"^description:\s*(.+?)(?:\n[a-zA-Z_]+:|\n---)", t, re.S | re.M)
     if not m:
         m = re.search(r"^description:\s*(.+)$", t, re.M)
@@ -57,10 +94,12 @@ def fm_desc(p):
 # ---------- CLAUDE.md (refreshed copy) ----------
 os.makedirs(SYS, exist_ok=True)
 if os.path.exists(CLAUDE_MD):
-    body = open(CLAUDE_MD, errors="ignore").read()
+    body = open(CLAUDE_MD, encoding="utf-8", errors="ignore").read()
     w(
         os.path.join(SYS, "CLAUDE.md"),
-        "---\nname: CLAUDE\ntags: [meta, type/system]\n---\n\n> Live copy of `~/.claude/CLAUDE.md` — refreshed by `/second-brain index`. ↩ [[_MOC-system]]\n\n"
+        "---\nname: CLAUDE\ntags: [meta, type/system]\n---\n\n> Live copy of `"
+        + CLAUDE_MD
+        + "` — refreshed by `/second-brain index`. ↩ [[_MOC-system]]\n\n"
         + body,
     )
 
@@ -78,7 +117,7 @@ for s in skills:
     desc = fm_desc(os.path.join(SKILLS_DIR, s, "SKILL.md"))
     w(
         os.path.join(SYS, "skills", f"skill-{s}.md"),
-        f"---\nname: skill-{s}\ntags: [meta, type/skill]\n---\n\n# 🧩 {s}\n\n{desc}\n\n`~/.claude/skills/{s}/SKILL.md` · ↩ [[_MOC-system]]\n",
+        f"---\nname: skill-{s}\ntags: [meta, type/skill]\n---\n\n# 🧩 {s}\n\n{desc}\n\n`{os.path.join(SKILLS_DIR, s, 'SKILL.md')}` · ↩ [[_MOC-system]]\n",
     )
 
 # ---------- workflows: hooks + commands + the memory loop ----------
@@ -117,7 +156,7 @@ for name, (ev, what) in HOOK_WHAT.items():
     ):
         w(
             os.path.join(SYS, "workflows", f"wf-{name}.md"),
-            f"---\nname: wf-{name}\ntags: [meta, type/workflow]\n---\n\n# ⚙ {name}\n\n**Event:** {ev}  \n**Does:** {what}\n\n`~/.claude/hooks/{name}` · ↩ [[_MOC-system]] · [[memory-loop]]\n",
+            f"---\nname: wf-{name}\ntags: [meta, type/workflow]\n---\n\n# ⚙ {name}\n\n**Event:** {ev}  \n**Does:** {what}\n\n`{os.path.join(HOOKS_DIR, name)}` · ↩ [[_MOC-system]] · [[memory-loop]]\n",
         )
 cmds = (
     sorted(f[:-3] for f in os.listdir(CMDS_DIR) if f.endswith(".md"))
@@ -128,7 +167,7 @@ for c in cmds:
     desc = fm_desc(os.path.join(CMDS_DIR, c + ".md")) or "slash command"
     w(
         os.path.join(SYS, "workflows", f"cmd-{c}.md"),
-        f"---\nname: cmd-{c}\ntags: [meta, type/workflow]\n---\n\n# ⌘ /{c}\n\n{desc}\n\n`~/.claude/commands/{c}.md` · ↩ [[_MOC-system]]\n",
+        f"---\nname: cmd-{c}\ntags: [meta, type/workflow]\n---\n\n# ⌘ /{c}\n\n{desc}\n\n`{os.path.join(CMDS_DIR, c + '.md')}` · ↩ [[_MOC-system]]\n",
     )
 # memory-loop overview
 w(
@@ -208,10 +247,10 @@ if PROJECTS:
         mocp = os.path.join(MEM, folder, moc_name(folder) + ".md")
         if not os.path.exists(mocp):
             continue
-        t = open(mocp, errors="ignore").read()
+        t = open(mocp, errors="ignore", encoding="utf-8").read()
         block = f"\n## Links\n- **Repo:** `{repo}`\n- **Live:** {url}\n- **Local:** `{path}`\n- ↩ [[_projects]]\n"
         t = BLOCK_RE.sub("", t).rstrip() + "\n" + block
-        open(mocp, "w").write(t)
+        open(mocp, "w", encoding="utf-8").write(t)
         injected += 1
     print(
         f"_projects.md written ({len(PROJECTS)} rows); Links blocks in {injected} MOCs"

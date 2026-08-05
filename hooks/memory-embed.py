@@ -13,6 +13,38 @@ to a clean no-op if the model/deps are unavailable."""
 
 import os, re, sys, glob, math, sqlite3, struct
 
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 MEM = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.expanduser(
     "~/.claude/second-brain-vault"
 )
@@ -24,7 +56,12 @@ EXCLUDE = {"MEMORY.md", "context.md", "_session-log.md"}
 # ---------------------------------------------------------------- pure helpers
 def is_note(p):
     """Mirror memory-recall's note filter: real curated notes only, at any depth."""
-    rel = os.path.relpath(p, MEM)
+    try:
+        rel = os.path.relpath(p, MEM)
+    except ValueError:
+        # Windows raises when the path and the vault sit on different drives.
+        # Something outside the vault is not a note.
+        return False
     parts = rel.split(os.sep)
     b = parts[-1]
     if b in EXCLUDE or b.startswith("_") or b.startswith("."):
@@ -41,7 +78,7 @@ def note_text(path):
     """Text to embed: name + description + a slice of the body (frontmatter stripped)."""
     name = os.path.splitext(os.path.basename(path))[0]
     try:
-        raw = open(path, errors="ignore").read()
+        raw = open(path, errors="ignore", encoding="utf-8").read()
     except Exception:
         return name
     body = re.sub(r"^---\n.*?\n---\n", "", raw, count=1, flags=re.S)

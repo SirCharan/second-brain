@@ -7,7 +7,8 @@
 #   git clone https://github.com/SirCharan/second-brain && ./second-brain/install.sh
 #
 # Re-runnable: re-running upgrades files and de-dupes hook registrations.
-# Undo with uninstall.sh. Flags: --no-setup (skip the wizard), --dry-run.
+# Undo with uninstall.sh. Flags: --no-setup (skip the wizard), --dry-run,
+#   --pack=none|core|core,writing|all (answer the starter-pack question up front).
 set -euo pipefail
 
 REPO_URL="https://github.com/SirCharan/second-brain"
@@ -16,13 +17,17 @@ CLAUDE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 VAULT="${CLAUDE_MEMORY_DIR:-$HOME/.claude/second-brain-vault}"
 DRY_RUN=0
 RUN_SETUP=1
+PACK=""
 for a in "$@"; do
   case "$a" in
     --dry-run) DRY_RUN=1 ;;
     --no-setup) RUN_SETUP=0 ;;
-    -h|--help) sed -n '2,10p' "$0" 2>/dev/null || true; exit 0 ;;
+    --pack=*) PACK="${a#--pack=}" ;;
+    -h|--help) sed -n '2,11p' "$0" 2>/dev/null || true; exit 0 ;;
   esac
 done
+# "all" is the friendly spelling of every tier; starter-pack.py understands both.
+[ "$PACK" = "none" ] && PACK=""
 
 # --- locate the source tree -------------------------------------------------
 # Piped through curl there is no script file on disk: BASH_SOURCE is unset and $0 is
@@ -54,7 +59,8 @@ VERSION="$(cat "$REPO/VERSION" 2>/dev/null || echo "unknown")"
 
 # --- preflight: fail BEFORE touching anything -------------------------------
 PY=""
-for c in python3 /usr/bin/python3 python; do
+# `py` first only matters under Git Bash on Windows, where `python3` is a Store stub.
+for c in python3 /usr/bin/python3 python py; do
   if command -v "$c" >/dev/null 2>&1; then
     if "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3,8) else 1)' 2>/dev/null; then
       PY="$c"; break
@@ -94,6 +100,11 @@ echo "second-brain $VERSION → installing into $CLAUDE"
 if [ "$DRY_RUN" = "1" ]; then
   echo "  (dry run) would copy hooks/, skills/second-brain/, workflows/vault-enrich.js"
   echo "  (dry run) would seed vault at $VAULT and register 9 hooks in $SETTINGS"
+  if [ -n "$PACK" ]; then
+    echo "  (dry run) would offer the starter pack: $PACK"
+  else
+    echo "  (dry run) would ask whether to install the starter pack (skills + vault notes)"
+  fi
   exit 0
 fi
 
@@ -109,6 +120,11 @@ chmod +x "$CLAUDE"/hooks/*.sh
 rm -rf "$CLAUDE/skills/second-brain"
 cp -R "$REPO/skills/second-brain" "$CLAUDE/skills/second-brain"
 cp "$REPO/workflows/vault-enrich.js" "$CLAUDE/workflows/vault-enrich.js"
+# The starter-pack source ships with the skill, not just in the repo: under `curl | bash`
+# the repo is a temp dir, so without this the user could never add a tier later.
+if [ -d "$REPO/starter-pack" ]; then
+  cp -R "$REPO/starter-pack" "$CLAUDE/skills/second-brain/starter-pack"
+fi
 echo "  ✓ hooks, skill, workflow copied"
 
 # --- vault ------------------------------------------------------------------
@@ -122,68 +138,18 @@ else
 fi
 
 # --- register hooks + write the install manifest (idempotent) ---------------
-"$PY" - "$SETTINGS" "$VAULT" "$VERSION" <<'PYEOF'
-import json, os, sys, shutil, time
-settings, vault, version = sys.argv[1], sys.argv[2], sys.argv[3]
-hooks_dir = os.path.join(os.path.dirname(settings), "hooks")
-def cmd(s): return s.replace("HOOKS", hooks_dir)
-FRAG = {
-  "SessionStart": [
-    {"hooks":[{"type":"command","command":cmd('bash "HOOKS/session-memory.sh"'),"timeout":8}]},
-    {"hooks":[{"type":"command","command":cmd('bash "HOOKS/session-resume.sh"'),"timeout":8}]},
-  ],
-  "UserPromptSubmit": [
-    {"hooks":[{"type":"command","command":cmd('python3 "HOOKS/interview-nudge.py"'),"timeout":10}]},
-    {"hooks":[{"type":"command","command":cmd('bash "HOOKS/memory-recall.sh"'),"timeout":15}]},
-    {"hooks":[{"type":"command","command":cmd('bash "HOOKS/context-monitor.sh"'),"timeout":15}]},
-  ],
-  "PostToolUse": [
-    {"matcher":"Edit|Write","hooks":[{"type":"command","command":cmd('bash "HOOKS/memory-lint.sh"'),"timeout":5}]},
-    {"matcher":"Bash","hooks":[{"type":"command","command":cmd('bash "HOOKS/stuck-detector.sh"'),"timeout":5}]},
-  ],
-  "Stop": [
-    {"matcher":"","hooks":[{"type":"command","command":cmd('bash "HOOKS/capture-exchange.sh"'),"timeout":10}]},
-  ],
-  "PreCompact": [
-    {"hooks":[{"type":"command","command":cmd('python3 "HOOKS/precompact-carryover.py"'),"timeout":10}]},
-  ],
-}
-OURS = ("session-memory","session-resume","interview-nudge","memory-recall","context-monitor",
-        "memory-lint","stuck-detector","capture-exchange","precompact-carryover")
-d, backup = {}, None
-if os.path.exists(settings):
-    d = json.load(open(settings))          # preflight already proved this parses
-    backup = settings + ".bak"
-    shutil.copy2(settings, backup)
-H = d.setdefault("hooks", {})
-def is_ours(entry):
-    return any(o in h.get("command","") for h in entry.get("hooks",[]) for o in OURS)
-for ev, entries in FRAG.items():
-    existing = [e for e in H.get(ev, []) if not is_ours(e)]  # drop our old copies only
-    H[ev] = existing + entries
-json.dump(d, open(settings,"w"), indent=2)
-print("  ✓ hooks registered in", settings)
-
-# Manifest: what this install touched, so uninstall.sh can undo exactly that.
-claude = os.path.dirname(settings)
-files = sorted(
-    os.path.join(claude, "hooks", f) for f in os.listdir(os.path.join(claude, "hooks"))
-    if f.endswith((".py", ".sh"))
-)
-man = {
-    "version": version, "installed_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-    "claude_dir": claude, "vault": vault,
-    "files": files,
-    "dirs": [os.path.join(claude, "skills", "second-brain")],
-    "workflows": [os.path.join(claude, "workflows", "vault-enrich.js")],
-    "settings": settings, "settings_backup": backup,
-    "hook_events": sorted(FRAG), "hook_names": list(OURS),
-}
-os.makedirs(os.path.join(vault, "_infra"), exist_ok=True)
-mp = os.path.join(vault, "_infra", "_install-manifest.json")
-json.dump(man, open(mp, "w"), indent=2)
-print("  ✓ manifest written to", mp)
-PYEOF
+# One implementation, shared with install.ps1 — see scripts/register-hooks.py.
+# Hooks are registered as "<python>" "<hook>.py"; the .sh wrappers are kept for
+# hand-invocation only, since every hook .py already exits 0 on its own.
+# Register an absolute interpreter, preferring the system one. The old .sh wrappers
+# pinned /usr/bin/python3 on purpose: a pyenv shim moves when the user switches version,
+# and a hook pointing at a vanished shim fails silently on every prompt.
+PYPATH="$(command -v "$PY" || echo "$PY")"
+if [ -x /usr/bin/python3 ] && /usr/bin/python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3,8) else 1)' 2>/dev/null; then
+  PYPATH=/usr/bin/python3
+fi
+"$PY" "$CLAUDE/skills/second-brain/scripts/register-hooks.py" \
+  "$SETTINGS" "$VAULT" "$VERSION" --python "$PYPATH"
 
 # Persist a non-default vault path, or it is forgotten on the next shell.
 if [ "$VAULT" != "$HOME/.claude/second-brain-vault" ]; then
@@ -196,10 +162,20 @@ if [ "$VAULT" != "$HOME/.claude/second-brain-vault" ]; then
 fi
 
 # --- guided setup -----------------------------------------------------------
+# SB_REPO points setup.py/starter-pack.py at this checkout, so a re-run from a clone
+# picks up local edits rather than the copy installed above.
+export SB_REPO="$REPO"
 SETUP="$CLAUDE/skills/second-brain/scripts/setup.py"
+PACK_SCRIPT="$CLAUDE/skills/second-brain/scripts/starter-pack.py"
 if [ "$RUN_SETUP" = "1" ] && [ -f "$SETUP" ]; then
   echo
-  CLAUDE_MEMORY_DIR="$VAULT" "$PY" "$SETUP" || echo "  ! setup skipped — re-run: $PY \"$SETUP\""
+  CLAUDE_MEMORY_DIR="$VAULT" "$PY" "$SETUP" ${PACK:+--pack "$PACK"} \
+    || echo "  ! setup skipped — re-run: $PY \"$SETUP\""
+elif [ -n "$PACK" ] && [ -f "$PACK_SCRIPT" ]; then
+  # --no-setup with an explicit --pack: install the pack, skip the wizard.
+  echo
+  CLAUDE_MEMORY_DIR="$VAULT" "$PY" "$PACK_SCRIPT" --tiers "$PACK" \
+    || echo "  ! starter pack skipped — re-run: $PY \"$PACK_SCRIPT\" --tiers $PACK"
 fi
 
 cat <<EOF
@@ -207,6 +183,7 @@ cat <<EOF
 second-brain $VERSION installed.
   Vault:  $VAULT
   Check:  $PY "$CLAUDE/skills/second-brain/scripts/doctor.py"
+  Pack:   $PY "$PACK_SCRIPT" --list      # optional skills + vault notes
   Undo:   bash uninstall.sh
 
 Restart Claude Code (or start a new session) so the hooks load.

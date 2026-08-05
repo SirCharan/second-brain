@@ -2,7 +2,41 @@
 """Shared helpers for the memory hooks. Python 3.9-safe, stdlib-only.
 Import works because Python puts the running script's dir on sys.path[0]."""
 
-import os, re, json, tempfile, time, traceback
+import os
+import subprocess, re, json, tempfile, time, traceback
+
+import sys
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 # Vault location: $CLAUDE_MEMORY_DIR wins, else a sensible default under ~/.claude.
 MEM = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.expanduser(
@@ -25,7 +59,11 @@ ERRLOG = os.path.join(STATE_DIR, "hook-errors.log")
 # builds this venv with fastembed; until then embed_ready() is False and recall stays
 # keyword-only. The embed script sits next to this file (both install modes).
 EMBED_SCRIPT = os.path.join(HOOK_DIR, "memory-embed.py")
-EMBED_VENV_PY = os.path.join(STATE_DIR, "venv-embed", "bin", "python")
+EMBED_VENV_PY = os.path.join(
+    STATE_DIR,
+    "venv-embed",
+    *(("Scripts", "python.exe") if os.name == "nt" else ("bin", "python")),
+)
 
 
 def embed_ready():
@@ -40,7 +78,7 @@ def load_config():
     import json
 
     try:
-        with open(os.path.join(MEM, "config.json"), errors="ignore") as f:
+        with open(os.path.join(MEM, "config.json"), errors="ignore", encoding="utf-8") as f:
             cfg = json.load(f)
             return cfg if isinstance(cfg, dict) else {}
     except Exception:
@@ -49,6 +87,17 @@ def load_config():
 
 CONFIG = load_config()
 
+
+
+def detach_kwargs():
+    """Popen kwargs that let a background refresh outlive this hook, per platform.
+    start_new_session is POSIX-only, so Windows gets the equivalent creation flag."""
+    if os.name == "nt":
+        flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
+            subprocess, "DETACHED_PROCESS", 0
+        )
+        return {"creationflags": flags}
+    return {"start_new_session": True}
 
 def vault_ok():
     """True only if the memory dir is present — hooks no-op cleanly otherwise."""
@@ -62,7 +111,7 @@ def atomic_write(path, text):
     os.makedirs(d, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp-", suffix=".swap")
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
         os.replace(tmp, path)
         return True
@@ -78,7 +127,7 @@ def read_json(path, default=None):
     import json
 
     try:
-        with open(path, errors="ignore") as f:
+        with open(path, errors="ignore", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {} if default is None else default
@@ -99,11 +148,11 @@ def log_err(hook, exc):
             (repr(exc) if not isinstance(exc, str) else exc)[:300],
         )
         os.makedirs(os.path.dirname(ERRLOG), exist_ok=True)
-        with open(ERRLOG, "a") as f:
+        with open(ERRLOG, "a", encoding="utf-8") as f:
             f.write(line)
         # trim if it grows past ~500 lines
         if os.path.getsize(ERRLOG) > 120_000:
-            with open(ERRLOG, errors="ignore") as f:
+            with open(ERRLOG, errors="ignore", encoding="utf-8") as f:
                 tail = f.readlines()[-300:]
             atomic_write(ERRLOG, "".join(tail))
     except Exception:
@@ -324,6 +373,224 @@ def real_prompt(s):
     return bool(s) and not _HARNESS_RE.search(s)
 
 
+
+# --- Multi-client hook envelope (Claude snake_case + Grok camelCase) ---
+# Grok stdin uses camelCase (sessionId, transcriptPath, stopHookActive, …).
+# Claude Code uses snake_case. normalize_hook() writes both so existing readers keep working.
+
+_HOOK_KEY_GROUPS = (
+    ("session_id", ("session_id", "sessionId")),
+    ("transcript_path", ("transcript_path", "transcriptPath")),
+    ("stop_hook_active", ("stop_hook_active", "stopHookActive")),
+    ("cwd", ("cwd", "workspaceRoot", "workspace_root")),
+    ("gitBranch", ("gitBranch", "git_branch")),
+    ("prompt", ("prompt",)),
+    ("source", ("source",)),
+    ("reason", ("reason",)),
+    ("tool_name", ("tool_name", "toolName")),
+    ("tool_input", ("tool_input", "toolInput")),
+    ("tool_response", ("tool_response", "toolResult", "tool_result")),
+    ("last_assistant_message", ("last_assistant_message", "lastAssistantMessage")),
+    ("hook_event_name", ("hook_event_name", "hookEventName")),
+)
+
+
+def _first_key(d, keys):
+    for k in keys:
+        if k in d and d[k] not in (None, ""):
+            return d[k]
+    return None
+
+
+def normalize_hook(hook):
+    """Return a shallow copy of the hook dict with dual-case aliases filled in.
+    Never raises; bad input → {}."""
+    if not isinstance(hook, dict):
+        return {}
+    out = dict(hook)
+    for canon, keys in _HOOK_KEY_GROUPS:
+        val = _first_key(out, keys)
+        if val is None:
+            continue
+        for k in keys:
+            out.setdefault(k, val)
+        out[canon] = val
+    # Grok often has workspaceRoot but not cwd — ensure cwd is set for project_for()
+    if not out.get("cwd"):
+        wr = out.get("workspaceRoot") or out.get("workspace_root")
+        if wr:
+            out["cwd"] = wr
+    return out
+
+
+
+def resolve_transcript_path(hook):
+    """Return a readable transcript path for Claude or Grok.
+    Prefer envelope transcript_path; else locate ~/.grok/sessions/**/<sessionId>/chat_history.jsonl.
+    Never raises."""
+    if not isinstance(hook, dict):
+        hook = {}
+    tpath = hook.get("transcript_path") or hook.get("transcriptPath")
+    if tpath and os.path.isfile(tpath):
+        return tpath
+    sid = (
+        hook.get("session_id")
+        or hook.get("sessionId")
+        or os.environ.get("GROK_SESSION_ID")
+        or ""
+    )
+    sid = str(sid).strip()
+    if not sid:
+        return None
+    base = os.path.expanduser("~/.grok/sessions")
+    if not os.path.isdir(base):
+        return None
+    try:
+        # Fast path: any directory named exactly the session id
+        for root, dirs, files in os.walk(base):
+            if os.path.basename(root) == sid and "chat_history.jsonl" in files:
+                return os.path.join(root, "chat_history.jsonl")
+        # Prefix match (short sid8)
+        for root, dirs, files in os.walk(base):
+            bn = os.path.basename(root)
+            if bn.startswith(sid) and "chat_history.jsonl" in files:
+                return os.path.join(root, "chat_history.jsonl")
+    except Exception as e:
+        log_err("resolve_transcript_path", e)
+    return None
+
+
+def extract_user_text(s):
+    """Pull the real user ask out of harness wrappers (Grok <user_query>, etc.)."""
+    if not s:
+        return s
+    m = re.search(r"<user_query>\s*(.*?)\s*</user_query>", s, re.S | re.I)
+    if m:
+        return m.group(1).strip()
+    # Drop leading system-reminder blocks for capture quality
+    s2 = re.sub(r"<system-reminder>[\s\S]*?</system-reminder>", "", s, flags=re.I)
+    s2 = re.sub(r"<user_info>[\s\S]*?</user_info>", "", s2, flags=re.I)
+    s2 = re.sub(r"<git_status>[\s\S]*?</git_status>", "", s2, flags=re.I)
+    s2 = re.sub(r"\s+", " ", s2).strip()
+    return s2 or s.strip()
+
+
+def emit_hook_context(text, event_name=None):
+    """Write hook → model context. Claude Code injects plain stdout on SessionStart /
+    UserPromptSubmit. Grok docs ignore passive stdout; it may honor Claude-compatible
+    hookSpecificOutput.additionalContext. Always also write a side-channel file under
+    the vault when GROK_SESSION_ID is set so AGENTS can force a read.
+    Never raises."""
+    if not text:
+        return
+    text = text if text.endswith("\n") else text + "\n"
+    is_grok = bool(
+        os.environ.get("GROK_SESSION_ID")
+        or os.environ.get("GROK_HOOK_EVENT")
+        or (event_name and "grok" in (event_name or "").lower())
+    )
+    # Detect Grok from envelope field names left in env by runner
+    try:
+        # Side-channel for model-compliance fallback (every Grok session + latest pointer)
+        if vault_ok():
+            inj = os.path.join(MEM, ".grok-inject")
+            os.makedirs(inj, exist_ok=True)
+            sid = (
+                os.environ.get("GROK_SESSION_ID")
+                or os.environ.get("CLAUDE_SESSION_ID")
+                or ""
+            )
+            if sid:
+                safe = re.sub(r"[^A-Za-z0-9_-]", "_", sid)[:64] or "nosession"
+                atomic_write(os.path.join(inj, safe + ".md"), text)
+            # Always refresh latest so a new session can read "what just happened"
+            atomic_write(os.path.join(inj, "latest.md"), text)
+    except Exception as e:
+        log_err("emit_hook_context.sidechannel", e)
+    try:
+        if is_grok or os.environ.get("GROK_SESSION_ID"):
+            ev = (
+                event_name
+                or os.environ.get("GROK_HOOK_EVENT")
+                or "UserPromptSubmit"
+            )
+            # Normalize env form session_start → SessionStart-ish for Claude compat
+            ev_map = {
+                "session_start": "SessionStart",
+                "user_prompt_submit": "UserPromptSubmit",
+                "stop": "Stop",
+            }
+            ev = ev_map.get(ev, ev)
+            if ev and ev[0].islower():
+                # session_start already mapped; leave Pascal if already
+                pass
+            payload = {
+                "hookSpecificOutput": {
+                    "hookEventName": ev if ev[0].isupper() or ev in (
+                        "SessionStart", "UserPromptSubmit", "Stop"
+                    ) else ev,
+                    "additionalContext": text.rstrip("\n"),
+                }
+            }
+            # Prefer PascalCase event names Grok docs use
+            he = payload["hookSpecificOutput"]["hookEventName"]
+            if he == "session_start":
+                payload["hookSpecificOutput"]["hookEventName"] = "SessionStart"
+            elif he == "user_prompt_submit":
+                payload["hookSpecificOutput"]["hookEventName"] = "UserPromptSubmit"
+            sys.stdout.write(json.dumps(payload) + "\n")
+        else:
+            sys.stdout.write(text)
+        sys.stdout.flush()
+    except Exception as e:
+        log_err("emit_hook_context", e)
+        try:
+            sys.stdout.write(text)
+        except Exception:
+            pass
+
+
+# Tool names that mean "file write/edit" across Claude Code and Grok
+_FILE_EDIT_TOOLS = frozenset({
+    "Edit", "Write", "NotebookEdit", "MultiEdit",
+    "search_replace", "write",  # Grok; write tool rare but possible
+})
+_BASH_TOOLS = frozenset({"Bash", "run_terminal_command"})
+
+
+def _content_blocks(o):
+    """Return content blocks from a Claude (message.content) or Grok (top-level content) row."""
+    msg = o.get("message") or {}
+    c = msg.get("content") if msg else None
+    if c is None:
+        c = o.get("content")
+    return c
+
+
+def _tool_calls_from_row(o, c):
+    """Yield (name, input_dict) from Claude tool_use blocks or Grok tool_calls."""
+    if isinstance(c, list):
+        for b in c:
+            if not isinstance(b, dict):
+                continue
+            if b.get("type") == "tool_use":
+                yield b.get("name", ""), b.get("input") or {}
+    # Grok: top-level tool_calls: [{name, arguments: json-str|dict}]
+    for tc in o.get("tool_calls") or []:
+        if not isinstance(tc, dict):
+            continue
+        name = tc.get("name") or ""
+        args = tc.get("arguments") or tc.get("input") or {}
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except Exception:
+                args = {}
+        if not isinstance(args, dict):
+            args = {}
+        yield name, args
+
+
 def scan_transcript(tpath, max_bytes=1048576):
     """Parse the tail of a session transcript — the single shared parser used by
     capture-exchange, precompact-carryover and context-dump. Skips sidechains and
@@ -332,8 +599,10 @@ def scan_transcript(tpath, max_bytes=1048576):
       files: ordered-unique file paths from Edit/Write/NotebookEdit/MultiEdit calls
       commands: recent Bash commands (whitespace-collapsed, 160 chars)
       errors: tool_result snippets the harness flagged is_error (200 chars)
-    The 1MB default tail matters: with a smaller window one large tool result evicts
-    the user/assistant pair and a big turn captures nothing."""
+    Accepts Claude Code JSONL (type + message.content + tool_use) and Grok
+    chat_history.jsonl (top-level content + tool_calls). The 1MB default tail
+    matters: with a smaller window one large tool result evicts the user/assistant
+    pair and a big turn captures nothing."""
     last_user = last_asst = None
     files, commands, errors = [], [], []
     for ln in tail_lines(tpath, max_bytes=max_bytes):
@@ -347,11 +616,10 @@ def scan_transcript(tpath, max_bytes=1048576):
         if o.get("isSidechain"):  # skip subagent turns
             continue
         t = o.get("type")
-        msg = o.get("message") or {}
-        c = msg.get("content")
+        c = _content_blocks(o)
         if t == "user":
             if isinstance(c, str) and real_prompt(c.strip()):
-                last_user = c.strip()
+                last_user = extract_user_text(c.strip())
             elif isinstance(c, list):
                 for b in c:
                     if not isinstance(b, dict):
@@ -359,10 +627,8 @@ def scan_transcript(tpath, max_bytes=1048576):
                     if b.get("type") == "text" and real_prompt(
                         b.get("text", "").strip()
                     ):
-                        last_user = b["text"].strip()
+                        last_user = extract_user_text(b["text"].strip())
                     elif b.get("type") == "tool_result" and b.get("is_error"):
-                        # only the harness's own failure flag — a file that merely
-                        # contains the word "error" is not an unresolved error
                         rc = b.get("content")
                         txt = (
                             rc
@@ -378,24 +644,41 @@ def scan_transcript(tpath, max_bytes=1048576):
                         s = re.sub(r"\s+", " ", txt).strip()
                         if s:
                             errors.append(s[:200])
-        elif t == "assistant" and isinstance(c, list):
+        elif t == "tool_result":
+            # Grok (and some Claude shapes): tool results as top-level rows
+            if o.get("is_error") or o.get("isError"):
+                rc = c if c is not None else o.get("result") or o.get("output")
+                txt = rc if isinstance(rc, str) else (
+                    " ".join(x.get("text", "") for x in rc if isinstance(x, dict))
+                    if isinstance(rc, list) else str(rc or "")
+                )
+                s = re.sub(r"\s+", " ", txt).strip()
+                if s:
+                    errors.append(s[:200])
+        elif t == "assistant":
             texts = []
-            for b in c:
-                if not isinstance(b, dict):
-                    continue
-                if b.get("type") == "text" and b.get("text", "").strip():
-                    texts.append(b["text"].strip())
-                elif b.get("type") == "tool_use":
-                    name = b.get("name", "")
-                    inp = b.get("input") or {}
-                    if name in ("Edit", "Write", "NotebookEdit", "MultiEdit"):
-                        fp = inp.get("file_path") or inp.get("notebook_path")
-                        if fp and fp not in files:
-                            files.append(fp)
-                    elif name == "Bash":
-                        cmd = (inp.get("command") or "").strip()
-                        if cmd:
-                            commands.append(re.sub(r"\s+", " ", cmd)[:160])
+            if isinstance(c, str) and c.strip():
+                texts.append(c.strip())
+            elif isinstance(c, list):
+                for b in c:
+                    if not isinstance(b, dict):
+                        continue
+                    if b.get("type") == "text" and b.get("text", "").strip():
+                        texts.append(b["text"].strip())
+            for name, inp in _tool_calls_from_row(o, c):
+                if name in _FILE_EDIT_TOOLS:
+                    fp = (
+                        inp.get("file_path")
+                        or inp.get("notebook_path")
+                        or inp.get("path")
+                        or inp.get("target_file")
+                    )
+                    if fp and fp not in files:
+                        files.append(fp)
+                elif name in _BASH_TOOLS:
+                    cmd = (inp.get("command") or "").strip()
+                    if cmd:
+                        commands.append(re.sub(r"\s+", " ", cmd)[:160])
             if texts:
                 last_asst = "\n".join(texts)
     return {

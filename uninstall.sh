@@ -47,7 +47,7 @@ if os.path.exists(manifest):
 
 # 1. hook files — only ones we ship, never anything the user added
 hooks_dir = os.path.join(claude, "hooks")
-shipped = set(man.get("hook_names", OURS)) | {"_hooklib", "memory-embed", "context-dump"}
+shipped = set(man.get("hook_names", OURS)) | {"_hooklib", "memory-embed", "context-dump", "sb_rank"}
 removed = 0
 if os.path.isdir(hooks_dir):
     for f in sorted(os.listdir(hooks_dir)):
@@ -56,6 +56,11 @@ if os.path.isdir(hooks_dir):
             if not dry: os.remove(os.path.join(hooks_dir, f))
             removed += 1
 say(f"removed {removed} hook file(s)")
+# Our own import cache, created the first time a hook ran. Ours to clean up.
+pyc = os.path.join(hooks_dir, "__pycache__")
+if os.path.isdir(pyc):
+    if not dry: shutil.rmtree(pyc, ignore_errors=True)
+    say("removed", pyc)
 
 # 2. skill + workflow
 for d in man.get("dirs", [os.path.join(claude, "skills", "second-brain")]):

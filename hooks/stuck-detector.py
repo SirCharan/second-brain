@@ -2,7 +2,40 @@
 """PostToolUse(Bash) hook: if the SAME command fails ≥2× in a row, nudge to query memory.
 Failure = clear markers in the tool output (not bare 'error', not grep/test exit-1). Never blocks."""
 
+import os
 import sys, os, re, json
+
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 try:
     import _hooklib as HL
@@ -42,7 +75,7 @@ def main():
     os.makedirs(STATE_DIR, exist_ok=True)
     sf = os.path.join(STATE_DIR, re.sub(r"[^A-Za-z0-9_-]", "_", sid) + ".json")
     try:
-        st = json.load(open(sf))
+        st = json.load(open(sf, encoding="utf-8"))
     except Exception:
         st = {}
 
@@ -69,7 +102,7 @@ def _save(sf, st):
         if HL:
             HL.write_json(sf, st)
         else:
-            json.dump(st, open(sf, "w"))
+            json.dump(st, open(sf, "w", encoding="utf-8"))
     except Exception:
         pass
 

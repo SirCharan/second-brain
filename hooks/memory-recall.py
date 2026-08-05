@@ -4,10 +4,43 @@ Word-boundary keyword match against the vault; requires >=2 distinct query keywo
 note's name/description (kills generic-prompt noise). Deduped within session, capped,
 project-biased. Silent on trivial/no-match prompts. Never blocks; logs failures."""
 
+import os
 import sys, os, re, glob, json, time
 
 import _hooklib as HL
 import sb_rank
+
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 MEM = HL.MEM
 STATE_DIR = os.path.join(MEM, ".recall-state")
@@ -33,7 +66,7 @@ def _latest_addition():
     else the most-recently-modified note name."""
     dfiles = sorted(glob.glob(os.path.join(MEM, "Daily", "20*.md")))
     for df in reversed(dfiles):
-        lines = [l.rstrip() for l in open(df, errors="ignore") if l.startswith("- ")]
+        lines = [l.rstrip() for l in open(df, errors="ignore", encoding="utf-8") if l.startswith("- ")]
         if lines:
             return re.sub(
                 r"^- \*\*\d{1,2}:\d{2}\*\*(\s*\[[^\]]*\])?\s*—\s*", "", lines[-1]
@@ -50,12 +83,12 @@ def _emit_note_debt():
     try:
         path = os.path.join(MEM, "_infra", "_note-debt.md")
         if not os.path.exists(path):
-            return
+            return None
         rows = [
-            l.strip() for l in open(path, errors="ignore") if l.startswith("- [ ] ")
+            l.strip() for l in open(path, errors="ignore", encoding="utf-8") if l.startswith("- [ ] ")
         ]
         if not rows:
-            return
+            return None
         projs, oldest = [], None
         for r in rows:
             # search PAST the "- [ ] " checkbox, or the regex matches "[ ]" not "[proj]"
@@ -82,9 +115,10 @@ def _emit_note_debt():
             "(v2 frontmatter + H1 + status chip + callouts + `## Related` linking "
             "its `_MOC-` hub), then it clears itself. See `_infra/_note-debt.md`."
         )
-        sys.stdout.write(msg + "\n")
+        return msg
     except Exception as e:
         HL.log_err("memory-recall.note-debt", e)
+        return None
 
 
 def _emit_stats(proj):
@@ -100,9 +134,10 @@ def _emit_stats(proj):
         line = f"\U0001f4ca Obsidian memory: {total} notes{yclause}"
         if latest:
             line += f" · latest: {latest}"
-        sys.stdout.write(line + "\n")
+        return line
     except Exception as e:
         HL.log_err("memory-recall.stats", e)
+        return None
 
 
 VENV_PY = HL.EMBED_VENV_PY  # optional semantic-embed venv (built by `sb-embed setup`)
@@ -119,7 +154,7 @@ def _semantic_fill(prompt, exclude, need):
         import subprocess
 
         r = subprocess.run(
-            [VENV_PY, EMBED, "query", prompt, "12"],
+            [VENV_PY, "-X", "utf8", EMBED, "query", prompt, "12"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -141,7 +176,7 @@ def _semantic_fill(prompt, exclude, need):
             continue
         d = ""
         try:
-            head = open(os.path.join(MEM, folder, name + ".md"), errors="ignore").read(
+            head = open(os.path.join(MEM, folder, name + ".md"), errors="ignore", encoding="utf-8").read(
                 2048
             )
             sm = re.search(r"^\s*status:\s*(.+)$", head, re.M)
@@ -161,15 +196,22 @@ def main():
     if not HL.vault_ok():
         return
     try:
-        hook = json.loads(sys.stdin.read())
+        hook = HL.normalize_hook(json.loads(sys.stdin.read()))
     except Exception:
         return
     prompt = (hook.get("prompt") or "").strip()
     sid = hook.get("session_id") or "nosession"
     proj = project_for(hook.get("cwd", ""))
-    _emit_stats(proj)  # always-on memory stats line (before the gate)
-    _emit_note_debt()  # unpaid curated-note debt, if any
+    preamble = []
+    s = _emit_stats(proj)  # always-on memory stats line (before the gate)
+    if s:
+        preamble.append(s)
+    d = _emit_note_debt()  # unpaid curated-note debt, if any
+    if d:
+        preamble.append(d)
     if not prompt or TRIVIAL.match(prompt):
+        if preamble:
+            HL.emit_hook_context("\n".join(preamble) + "\n")
         return
     kw = {w for w in words(prompt) if w not in STOP}
     if len(kw) < 3:
@@ -196,6 +238,8 @@ def main():
             for (n, f, d) in _semantic_fill(prompt, exclude, need)
         ]
     if not fresh:
+        if preamble:
+            HL.emit_hook_context("\n".join(preamble) + "\n")
         return
 
     # Head-first injection: the TOP hit gets its full body (only when it respects the 8KB
@@ -211,11 +255,11 @@ def main():
         extra = []
         try:
             if i == 0 and os.path.getsize(p) <= SPLIT_GATE:
-                body = open(p, errors="ignore").read()
+                body = open(p, errors="ignore", encoding="utf-8").read()
                 body = re.sub(r"^---\n.*?\n---\n", "", body, count=1, flags=re.S)
                 extra = ["", body.strip(), ""]
             else:
-                head = open(p, errors="ignore").read(2048)
+                head = open(p, errors="ignore", encoding="utf-8").read(2048)
                 extra = [
                     "  " + l.strip()[:160]
                     for l in head.splitlines()
@@ -236,7 +280,8 @@ def main():
     out.append(
         "(Open a note or `/second-brain find <term>` for more. Recalled once per session.)"
     )
-    sys.stdout.write("\n".join(out) + "\n")
+    parts = (preamble + out) if preamble else out
+    HL.emit_hook_context("\n".join(parts) + "\n")
 
     try:
         HL.write_json(

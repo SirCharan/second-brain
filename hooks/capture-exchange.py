@@ -3,10 +3,43 @@
 Distilled from a <!--CAPTURE: ...--> footer if present, else a raw fallback from the user msg.
 Reads only the TAIL of the (possibly 20MB+) transcript. Never blocks; logs failures."""
 
+import os
 import sys, os, json, re
 from datetime import datetime
 
 import _hooklib as HL
+
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 
 def _write_last_session(now, proj, branch, last_user, last_asst):
@@ -70,7 +103,7 @@ def _write_session_note(now, sid, proj, branch, entry, links, scan=None):
         path = os.path.join(sdir, f"{day}__{sid8}.md")
         log, related, txt = [], [], ""
         if os.path.exists(path):
-            txt = open(path, errors="ignore").read()
+            txt = open(path, errors="ignore", encoding="utf-8").read()
             log = re.findall(r"^- \*\*\d\d:\d\d\*\* .*$", txt, re.M)
             if "## Related" in txt:
                 related = re.findall(r"\[\[([^\]]+)\]\]", txt.split("## Related", 1)[1])
@@ -151,7 +184,7 @@ def _update_note_debt(now, sid, proj, files):
         if os.path.exists(path):
             existing = [
                 l.rstrip()
-                for l in open(path, errors="ignore")
+                for l in open(path, errors="ignore", encoding="utf-8")
                 if l.startswith("- [ ] ")
             ]
         # drop entries whose project gained a note after the recorded baseline
@@ -226,14 +259,16 @@ def main():
     if not HL.vault_ok():
         return
     try:
-        hook = json.loads(sys.stdin.read())
+        hook = HL.normalize_hook(json.loads(sys.stdin.read()))
     except Exception:
         return
     if hook.get("stop_hook_active"):
         return
-    tpath = hook.get("transcript_path")
-    if not tpath or not os.path.exists(tpath):
-        return
+    # Grok fires Stop on end_turn AND an observe-only Stop at session end.
+    # Capture on end_turn (and empty reason = Claude). Also capture SessionEnd
+    # (channel_closed) so a killed session still leaves a Daily line if we have text.
+    reason = (hook.get("reason") or "").strip()
+    # never skip — channel_closed still captures if lastAssistantMessage/transcript has content
     cwd = hook.get("cwd") or ""
     branch = hook.get("gitBranch") or ""
     # Route to the vault folder, not the raw cwd basename: a subdir like <repo>/web must
@@ -242,13 +277,32 @@ def main():
     proj, _proj_is_new = HL.route_project(cwd)
     proj = proj or ""
 
-    # 1MB tail + the shared parser: keeps the last genuine user/assistant pair even when
-    # a large tool result sits between them, filters harness-injected "user" messages,
-    # and extracts files/commands/errors for the session note.
-    scan = HL.scan_transcript(tpath, max_bytes=1_048_576)
+    # Transcript: envelope path, else Grok sessions dir by sessionId
+    tpath = HL.resolve_transcript_path(hook)
+    scan = {
+        "last_user": None,
+        "last_asst": None,
+        "files": [],
+        "commands": [],
+        "errors": [],
+    }
+    if tpath:
+        scan = HL.scan_transcript(tpath, max_bytes=1_048_576)
     # redact high-confidence secret token shapes before any raw turn text hits disk
     last_user = HL.scrub_secrets(scan["last_user"])
     last_asst = HL.scrub_secrets(scan["last_asst"])
+    # Prefer lastAssistantMessage when it has a CAPTURE footer (freshest turn)
+    lam = HL.scrub_secrets(hook.get("last_assistant_message") or "") or None
+    if lam:
+        if re.search(r"<!--\s*CAPTURE:", lam, re.I) or not last_asst:
+            last_asst = lam
+        elif last_asst and lam and len(lam) >= len(last_asst):
+            # Grok envelope often holds the full final assistant text
+            last_asst = lam
+    if last_user:
+        last_user = HL.scrub_secrets(HL.extract_user_text(last_user))
+    if not last_user and not last_asst:
+        return
 
     captured_type = None
     m = re.search(r"<!--\s*CAPTURE:\s*(.*?)\s*-->", last_asst or "", re.S)
@@ -269,6 +323,11 @@ def main():
     elif last_user:
         u = re.sub(r"\s+", " ", last_user).strip()
         entry = "(raw) " + (u[:140] + ("…" if len(u) > 140 else ""))
+    elif last_asst:
+        # Grok/Claude turn with no CAPTURE footer and no parseable user text —
+        # still write a Daily line from the assistant reply so nothing is lost.
+        a = re.sub(r"\s+", " ", last_asst).strip()
+        entry = "(raw) " + (a[:140] + ("…" if len(a) > 140 else ""))
     else:
         return
 
@@ -279,7 +338,7 @@ def main():
     dfile = os.path.join(ddir, day + ".md")
     # exclusive create of the header (no double-header race between concurrent Stops)
     try:
-        with open(dfile, "x") as f:
+        with open(dfile, "x", encoding="utf-8") as f:
             f.write(
                 f"---\nname: {day}\ntags: [journal, meta]\n---\n\n# {day}\n\n"
                 f"Auto-captured exchanges (via `capture-exchange` Stop hook). ↩ [[_Home]]\n\n"
@@ -292,14 +351,14 @@ def main():
     # bookkeeping below must still run, or a repeated turn would silently drop all of it.
     dup = False
     try:
-        prev = [l for l in open(dfile, errors="ignore") if l.startswith("- **")]
+        prev = [l for l in open(dfile, errors="ignore", encoding="utf-8") if l.startswith("- **")]
         dup = bool(prev) and re.sub(r"^- \*\*\d\d:\d\d\*\*", "", prev[-1]).strip() == (
             f"{ctx} — {entry}".strip()
         )
     except Exception:
         pass
     if not dup:
-        with open(dfile, "a") as f:  # append is atomic for a single small write
+        with open(dfile, "a", encoding="utf-8") as f:  # append is atomic for a single small write
             f.write(f"- **{now.strftime('%H:%M')}**{ctx} — {entry}\n")
 
     # Distilled last-session digest (overwritten each turn) — session-resume.py injects this on
@@ -321,7 +380,7 @@ def main():
         try:
             os.makedirs(os.path.dirname(q), exist_ok=True)
             try:
-                with open(q, "x") as f:
+                with open(q, "x", encoding="utf-8") as f:
                     f.write(
                         "---\nname: _promote-queue\ntags: [meta, type/index]\n---\n\n"
                         "# Promote queue\n\nResearch/learnings flagged for curation into atomic "
@@ -330,7 +389,7 @@ def main():
                     )
             except FileExistsError:
                 pass
-            with open(q, "a") as f:
+            with open(q, "a", encoding="utf-8") as f:
                 f.write(f"- [ ] {day} {now.strftime('%H:%M')}{ctx} — {entry}\n")
         except Exception as e:
             HL.log_err("capture-exchange.queue", e)

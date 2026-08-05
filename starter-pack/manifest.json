@@ -1,0 +1,106 @@
+{
+  "_comment": "Third-party packs the starter-pack skills route to. These are NOT redistributed here — the installer prints these commands and you run them, so the code keeps coming from its author. Every source below was verified against a live upstream; a pack whose upstream could not be verified is listed under _unbundled instead of being shipped with a guessed URL.",
+  "gstack": {
+    "why": "The Think -> Plan -> Build -> Review -> Test -> Ship -> Reflect toolchain that gtan-workflow routes to. 23 commands: /office-hours, /autoplan, /review, /qa, /ship, /land-and-deploy and the rest.",
+    "author": "Garry Tan",
+    "license": "MIT",
+    "source": "https://github.com/garrytan/gstack",
+    "install": [
+      "git clone --depth 1 --single-branch https://github.com/garrytan/gstack.git ~/.claude/skills/gstack",
+      "cd ~/.claude/skills/gstack && ./setup"
+    ],
+    "needs": [
+      "bun"
+    ],
+    "note": "The setup script registers the commands and builds a browser binary, so it takes a few minutes and wants network access.",
+    "required_by": [
+      "gtan-workflow"
+    ]
+  },
+  "superpowers": {
+    "why": "Test-driven development, systematic-debugging, brainstorming and verification-before-completion. build-tdd chains its TDD and completion-gate skills.",
+    "author": "obra",
+    "license": "see upstream",
+    "source": "https://github.com/obra/superpowers-marketplace",
+    "install": [
+      "claude plugin marketplace add obra/superpowers-marketplace",
+      "claude plugin install superpowers@superpowers-marketplace"
+    ],
+    "needs": [],
+    "required_by": [
+      "build-tdd"
+    ]
+  },
+  "ui-ux-pro-max": {
+    "why": "The design-intelligence engine design-router treats as the primary for all non-branded UI: palettes, styles, font pairings, chart palettes and stack best-practices behind a BM25 search. pro-max-search documents how to drive it.",
+    "author": "nextlevelbuilder",
+    "license": "see upstream",
+    "source": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+    "install": [
+      "claude plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill",
+      "claude plugin install ui-ux-pro-max@ui-ux-pro-max-skill"
+    ],
+    "needs": [],
+    "required_by": [
+      "design-router",
+      "pro-max-search",
+      "design-build"
+    ]
+  },
+  "stop-slop": {
+    "why": "The primary anti-slop pass on the writing-router's anti-slop axis: the five-dimension rubric over openers, jargon, contrasts, passive voice and specificity.",
+    "author": "Hardik Pandya",
+    "license": "MIT",
+    "source": "https://github.com/hardikpandya/stop-slop",
+    "install": [
+      "git clone --depth 1 https://github.com/hardikpandya/stop-slop.git /tmp/stop-slop && cp -R /tmp/stop-slop ~/.claude/skills/stop-slop"
+    ],
+    "needs": [],
+    "required_by": [
+      "writing-router"
+    ]
+  },
+  "anti-ai-slop-writing": {
+    "why": "Used by writing-router as the banned-word dictionary and punctuation ratios only, not as a second full workflow alongside stop-slop.",
+    "author": "jalaalrd",
+    "license": "see upstream",
+    "source": "https://github.com/jalaalrd/anti-ai-slop-writing",
+    "install": [
+      "git clone --depth 1 https://github.com/jalaalrd/anti-ai-slop-writing.git /tmp/aasw && cp -R /tmp/aasw/skills/anti-ai-slop-writing ~/.claude/skills/anti-ai-slop-writing"
+    ],
+    "needs": [],
+    "required_by": [
+      "writing-router"
+    ]
+  },
+  "plain-writing": {
+    "why": "The plain-word end of the writing-router's clarity axis: everyday words, no jargon, plus a revision view of what it changed.",
+    "author": "Shreya Shankar",
+    "license": "MIT",
+    "source": "https://github.com/docwriter-org/plain-writing-skill",
+    "install": [
+      "git clone --depth 1 https://github.com/docwriter-org/plain-writing-skill.git /tmp/plain-writing && cp -R /tmp/plain-writing ~/.claude/skills/plain-writing"
+    ],
+    "needs": [],
+    "required_by": [
+      "writing-router"
+    ]
+  },
+  "ponytail": {
+    "why": "The minimal-code discipline build-tdd builds under: YAGNI, stdlib first, no unrequested abstractions.",
+    "author": "DietrichGebert",
+    "license": "see upstream",
+    "source": "https://github.com/DietrichGebert/ponytail",
+    "install": [
+      "claude plugin marketplace add DietrichGebert/ponytail",
+      "claude plugin install ponytail@ponytail"
+    ],
+    "needs": [],
+    "required_by": [
+      "build-tdd"
+    ]
+  },
+  "_unbundled": {
+    "writing-clearly-and-concisely": "Strunk's Elements of Style (1918) as a reference skill. The 1918 text is public domain; the skill wrapper's upstream could not be verified, so no source is claimed here. Any Elements of Style reference skill satisfies the writing-router's Strunk slot."
+  }
+}

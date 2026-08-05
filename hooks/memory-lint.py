@@ -3,9 +3,42 @@
 missing frontmatter, unresolved [[wikilinks]], or an orphan (no outbound links).
 Prints a short warning to stdout only when something's off; silent otherwise. Exit 0 always."""
 
+import os
 import sys, os, json, re, glob
 
 import _hooklib as HL
+
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 MEM = HL.MEM
 # Structural link targets that intentionally have no note file, plus any
@@ -39,7 +72,7 @@ def main():
     if not os.path.exists(rp):
         return
 
-    txt = open(rp, errors="ignore").read()
+    txt = open(rp, errors="ignore", encoding="utf-8").read()
     warns = []
     if not txt.startswith("---\n") or txt.find("\n---", 4) == -1:
         warns.append("no YAML frontmatter")

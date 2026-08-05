@@ -4,7 +4,43 @@ Read-only without --fix. Always exit 0 (it's a report)."""
 
 import os, re, sys, json, glob, subprocess
 
+# Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
+# glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
+# can only be set at startup, so re-exec into it once when we were not started that way.
+if (
+    __name__ == "__main__"  # never re-exec when imported as a library
+    and os.name == "nt"
+    and not sys.flags.utf8_mode
+    and not os.environ.get("SB_UTF8_REEXEC")
+    and getattr(sys, "frozen", None) is None
+):
+    # os.execv does not replace the process on Windows: the parent exits immediately with
+    # its own status while the child keeps running, so the caller reads the wrong exit
+    # code. Re-run synchronously and pass the child's code up. stdin/stdout are inherited,
+    # so a hook still receives its JSON payload.
+    import subprocess
+
+    os.environ["SB_UTF8_REEXEC"] = "1"
+    try:
+        sys.exit(
+            subprocess.run(
+                [sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]
+            ).returncode
+        )
+    except OSError:
+        pass  # fall through to the stream guard rather than refusing to run
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 HOME = os.path.expanduser("~")
+WINDOWS = os.name == "nt"
+# Honour a relocated config dir; the vault default stays under ~/.claude to match
+# _hooklib and install.sh, which key off CLAUDE_MEMORY_DIR alone.
+CLAUDE_DIR = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(HOME, ".claude")
 MEM = os.environ.get("CLAUDE_MEMORY_DIR") or os.path.join(
     HOME, ".claude/second-brain-vault"
 )
@@ -21,7 +57,7 @@ _CANDIDATES = [
     os.path.join(
         _SCRIPTDIR, "..", "..", "..", "hooks"
     ),  # plugin layout: skills/second-brain/scripts → root/hooks
-    os.path.join(HOME, ".claude/hooks"),  # install.sh layout
+    os.path.join(CLAUDE_DIR, "hooks"),  # install.sh layout
 ]
 HOOKS = next(
     (
@@ -29,14 +65,14 @@ HOOKS = next(
         for p in _CANDIDATES
         if p and os.path.isfile(os.path.join(p, "_hooklib.py"))
     ),
-    os.path.join(HOME, ".claude/hooks"),
+    os.path.join(CLAUDE_DIR, "hooks"),
 )
 PLUGIN_JSON = os.path.abspath(
     os.path.join(HOOKS, "..", ".claude-plugin", "plugin.json")
 )
 IS_PLUGIN = os.path.isfile(PLUGIN_JSON)
 # plugin.json and settings.json share the same {"hooks": {...}} shape, so the same parse works.
-SETTINGS = PLUGIN_JSON if IS_PLUGIN else os.path.join(HOME, ".claude/settings.json")
+SETTINGS = PLUGIN_JSON if IS_PLUGIN else os.path.join(CLAUDE_DIR, "settings.json")
 STATE_DIR = os.environ.get("SECOND_BRAIN_STATE_DIR") or os.path.join(
     HOME, ".second-brain"
 )
@@ -52,7 +88,7 @@ def _find_python():
     made doctor FAIL on machines whose Python comes from Homebrew, nix, or a distro."""
     import shutil
 
-    for c in (sys.executable, "python3", "/usr/bin/python3", "python"):
+    for c in (sys.executable, "python3", "/usr/bin/python3", "python", "py"):
         p = shutil.which(c) if c and not os.path.isabs(c) else c
         if p and os.path.exists(p):
             return p
@@ -103,18 +139,36 @@ chk(
 )
 # symlink (optional — only when SECOND_BRAIN_OBSIDIAN_LINK is set)
 if VAULT_LINK:
+    # A junction reports as a link too, so islink covers both once it exists.
     link_ok = os.path.islink(VAULT_LINK) and os.path.realpath(
         VAULT_LINK
     ) == os.path.realpath(MEM)
+    manual = f'ln -s "{MEM}" "{VAULT_LINK}"'
+    if WINDOWS:
+        manual = f'cmd /c mklink /J "{VAULT_LINK}" "{MEM}"'
     if not link_ok and FIX and os.path.isdir(os.path.dirname(VAULT_LINK)):
         try:
             if os.path.islink(VAULT_LINK) or os.path.exists(VAULT_LINK):
                 os.remove(VAULT_LINK)
-            os.symlink(MEM, VAULT_LINK)
+            os.symlink(MEM, VAULT_LINK, target_is_directory=True)
             link_ok = True
+        except OSError:
+            # Windows refuses symlinks without Developer Mode or admin. A directory
+            # junction needs neither, so try that before reporting anything.
+            if WINDOWS:
+                try:
+                    subprocess.run(
+                        ["cmd", "/c", "mklink", "/J", VAULT_LINK, MEM],
+                        check=True,
+                        capture_output=True,
+                    )
+                    link_ok = os.path.exists(VAULT_LINK)
+                except Exception:
+                    pass
         except Exception as e:
             rows.append(("FAIL", "symlink repair", repr(e), "", False))
-    chk("Obsidian vault symlink", link_ok, VAULT_LINK)
+    # An unlinkable mirror is inconvenient, not broken: the vault itself still works.
+    chk("Obsidian vault symlink", link_ok, VAULT_LINK, warn=True, fix=manual)
 # writable dirs
 for d in ("Daily", ".recall-state"):
     dp = os.path.join(MEM, d)
@@ -126,18 +180,24 @@ for d in ("Daily", ".recall-state"):
     ok = os.path.isdir(dp) and os.access(dp, os.W_OK)
     chk(f"{d}/ writable", ok, dp, warn=True, fix=f'mkdir -p "{dp}"')
 # hook files present + executable
+# The .py files are what the registrations actually run. The .sh wrappers are a
+# hand-invocation convenience and do not exist to be run on Windows at all.
 need = [
-    "session-memory.sh",
-    "session-resume.sh",
+    "session-memory.py",
     "session-resume.py",
-    "capture-exchange.sh",
     "capture-exchange.py",
-    "memory-lint.sh",
     "memory-lint.py",
-    "memory-recall.sh",
     "memory-recall.py",
     "_hooklib.py",
 ]
+if not WINDOWS:
+    need += [
+        "session-memory.sh",
+        "session-resume.sh",
+        "capture-exchange.sh",
+        "memory-lint.sh",
+        "memory-recall.sh",
+    ]
 missing = [h for h in need if not os.path.exists(os.path.join(HOOKS, h))]
 chk(
     "hook files present",
@@ -148,7 +208,8 @@ chk(
 nonexec = [
     h
     for h in need
-    if h.endswith(".sh")
+    if not WINDOWS
+    and h.endswith(".sh")
     and os.path.exists(os.path.join(HOOKS, h))
     and not os.access(os.path.join(HOOKS, h), os.X_OK)
 ]
@@ -160,7 +221,7 @@ chk(
 )
 # registration in settings.json
 try:
-    d = json.load(open(SETTINGS))
+    d = json.load(open(SETTINGS, encoding="utf-8"))
     H = d.get("hooks", {})
     cmds = " ".join(
         h.get("command", "")
@@ -194,7 +255,7 @@ try:
         for ev in H.values()
         for e in ev
         for h in e.get("hooks", [])
-        if "timeout" in h and "hooks/" in h.get("command", "")
+        if "timeout" in h and "hooks" in h.get("command", "")
     )
     chk(
         "hook timeouts set",
@@ -223,7 +284,7 @@ notes = [
 def _has_status(path):
     """Parse the real frontmatter block — a fixed char window misses notes whose
     description pushes `status:` further down."""
-    t = open(path, errors="ignore").read()
+    t = open(path, errors="ignore", encoding="utf-8").read()
     if not t.startswith("---\n"):
         return False
     end = t.find("\n---", 4)
@@ -257,7 +318,7 @@ chk(
 # error log tail
 elog = os.path.join(STATE_DIR, "hook-errors.log")
 if os.path.exists(elog):
-    tail = open(elog, errors="ignore").read().strip().splitlines()[-3:]
+    tail = open(elog, errors="ignore", encoding="utf-8").read().strip().splitlines()[-3:]
     chk(
         "hook-errors.log",
         len(tail) == 0,
@@ -291,7 +352,7 @@ chk(
 # project routing — the single most common reason notes land in the wrong place
 _cfg_path = os.path.join(MEM, "config.json")
 try:
-    _pmap = (json.load(open(_cfg_path)) or {}).get("project_map") or {}
+    _pmap = (json.load(open(_cfg_path, encoding="utf-8")) or {}).get("project_map") or {}
 except Exception:
     _pmap = {}
 chk(
@@ -325,7 +386,7 @@ if sys.platform == "darwin":
 for cname, cpath in _clients.items():
     reg = False
     try:
-        reg = "second-brain" in json.load(open(cpath)).get("mcpServers", {})
+        reg = "second-brain" in json.load(open(cpath, encoding="utf-8")).get("mcpServers", {})
     except Exception:
         reg = False
     chk(
