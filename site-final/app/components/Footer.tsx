@@ -1,8 +1,9 @@
+import Link from "next/link";
 import CopyCommand from "./CopyCommand";
 import { GitHubMark } from "./Mark";
 
 const REPO = "https://github.com/SirCharan/second-brain";
-const INSTALL = "/plugin marketplace add SirCharan/second-brain";
+const INSTALL = "curl -fsSL https://charandeepkapoor.com/second-brain/install.sh | bash";
 
 /** Closing CTA + giant wordmark — locked from screenshot cut. */
 export default function Footer() {
@@ -38,14 +39,9 @@ export default function Footer() {
           >
             Why we built it
           </a>
-          <a
-            href={`${REPO}#install`}
-            target="_blank"
-            rel="noreferrer"
-            className="transition-colors hover:text-ink"
-          >
+          <Link href="/get-started" className="transition-colors hover:text-ink">
             Install guide
-          </a>
+          </Link>
           <span className="text-ink-faint">Apache-2.0</span>
         </div>
       </div>

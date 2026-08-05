@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import GraphField from "./GraphField";
 import CopyCommand from "./CopyCommand";
 import { GitHubMark } from "./Mark";
 
 const REPO = "https://github.com/SirCharan/second-brain";
-const INSTALL = "/plugin marketplace add SirCharan/second-brain";
+const INSTALL = "curl -fsSL https://charandeepkapoor.com/second-brain/install.sh | bash";
+const DMG = `${REPO}/releases/latest/download/Second-Brain-Setup.dmg`;
 
 /** Hero: copy left-pocketed so the graph stays the star on the right.
  *  ?cinematic=1 → launch-reel drama (hotter cascade, lighter scrim). */
@@ -77,9 +79,18 @@ export default function Hero() {
               <div className="pointer-events-auto mt-9">
                 <CopyCommand command={INSTALL} />
                 <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-faint">
-                  <span>
-                    or <code className="font-mono text-ink-dim">./install.sh</code>
-                  </span>
+                  <a
+                    href={DMG}
+                    className="text-ink-dim transition-colors hover:text-ink"
+                  >
+                    Download for Mac (.dmg)
+                  </a>
+                  <Link
+                    href="/get-started"
+                    className="text-ink-dim transition-colors hover:text-ink"
+                  >
+                    Get started →
+                  </Link>
                   <a
                     href={REPO}
                     target="_blank"

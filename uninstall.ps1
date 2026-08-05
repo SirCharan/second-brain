@@ -76,7 +76,7 @@ if os.path.isdir(pyc):
     if not dry: shutil.rmtree(pyc, ignore_errors=True)
     say("removed", pyc)
 
-for d in man.get("dirs", [os.path.join(claude, "skills", "second-brain")]):
+for d in man.get("dirs", [os.path.join(claude, "skills", "second-brain"), os.path.join(claude, "mcp")]):
     if os.path.isdir(d):
         if not dry: shutil.rmtree(d)
         say("removed", d)

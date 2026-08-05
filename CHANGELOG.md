@@ -4,6 +4,27 @@ Notable changes per release. The current version lives in [`VERSION`](VERSION).
 
 ## 0.6.0
 
+### Guided onboarding
+
+- The install one-liner moved to the landing domain: `curl -fsSL
+  https://charandeepkapoor.com/second-brain/install.sh | bash` (a redirect to the same script on
+  `main`; the raw URL still works). Windows: `irm
+  https://charandeepkapoor.com/second-brain/install.ps1 | iex`.
+- Both installers now ship `mcp/` into `~/.claude/mcp/`, recorded in the install manifest so
+  uninstall removes it.
+- The setup wizard gained three steps: connect Claude Desktop and Cursor (`mcp-setup.py
+  --write`), an opt-in `[experimental]` ChatGPT/claude.ai remote (prints the tunnel command,
+  never launches it), and a live capture test that pipes a synthetic session through the
+  installed hooks and confirms today's `Daily/` note grew. The test is also standalone:
+  `setup.py --verify-capture`.
+- `/second-brain setup` is now a conversational in-Claude onboarding checklist wrapping the same
+  engines.
+- The "Second Brain Setup" macOS app is back (`installer/`, Tauri v2), rebuilt as a 7-step
+  wizard over `install.sh` — prereqs with a double-install guard, install, track projects,
+  connect apps, ChatGPT (copy-only), Obsidian, done. Ships unsigned as
+  `Second-Brain-Setup.dmg` on GitHub Releases.
+- The landing site gained `/get-started` — the same six steps as a copy-paste page.
+
 ### Windows
 
 Windows was unsupported for four specific reasons, all now fixed. WSL2 always worked because

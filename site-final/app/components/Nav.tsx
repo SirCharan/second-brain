@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Mark, GitHubMark } from "./Mark";
 
 const REPO = "https://github.com/SirCharan/second-brain";
@@ -16,31 +17,37 @@ export default function Nav() {
   return (
     <nav className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">
       <div className="flex w-full max-w-6xl items-center justify-between rounded-2xl border border-line bg-surface/55 py-2.5 pl-4 pr-2.5 backdrop-blur-md">
-        <a href="#top" className="flex items-center gap-2.5">
+        <Link href="/#top" className="flex items-center gap-2.5">
           <Mark />
           <span className="font-display text-lg leading-none tracking-tight">
             second-brain
           </span>
-        </a>
+        </Link>
         <div className="flex items-center gap-1 sm:gap-1.5">
-          <a
-            href="#context"
+          <Link
+            href="/#context"
             className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink md:inline"
           >
             Context tax
-          </a>
-          <a
-            href="#saved"
+          </Link>
+          <Link
+            href="/#saved"
             className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink md:inline"
           >
             Saved
-          </a>
-          <a
-            href="#compare"
+          </Link>
+          <Link
+            href="/#compare"
             className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink sm:inline"
           >
             Compare
-          </a>
+          </Link>
+          <Link
+            href="/get-started"
+            className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink sm:inline"
+          >
+            Get started
+          </Link>
           <a
             href={REPO}
             target="_blank"

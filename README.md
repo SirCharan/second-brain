@@ -82,8 +82,11 @@ hand on macOS or Linux; nothing depends on them.
 **Windows.** Use `install.ps1` in PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/SirCharan/second-brain/main/install.ps1 | iex
+irm https://charandeepkapoor.com/second-brain/install.ps1 | iex
 ```
+
+(Redirects to `install.ps1` on `main`; the direct path is
+`https://raw.githubusercontent.com/SirCharan/second-brain/main/install.ps1`.)
 
 Two things differ. Semantic recall's setup script (`embed-setup.sh`) is bash, so that optional
 extra is macOS and Linux only — keyword recall, which is the default, works everywhere. And
@@ -95,19 +98,34 @@ blocked. WSL2 also works, using the normal `install.sh`.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/SirCharan/second-brain/main/install.sh | bash
+curl -fsSL https://charandeepkapoor.com/second-brain/install.sh | bash
 ```
 
-That copies the hooks, skill, and workflow into `~/.claude/`, creates your vault from
+(The URL redirects to `install.sh` on `main` in this repo — same script. Fetch it from
+`https://raw.githubusercontent.com/SirCharan/second-brain/main/install.sh` if you prefer the
+direct path.)
+
+That copies the hooks, skill, workflow and MCP server into `~/.claude/`, creates your vault from
 `vault-template/`, registers the hooks in `~/.claude/settings.json`, and then runs a short
-setup wizard that finds your git repositories and writes the routing config.
+setup wizard that finds your git repositories, writes the routing config, offers to connect
+Claude Desktop and Cursor, and ends with a live capture test.
+
+**Mac app.** Prefer clicking to pasting? Download
+[Second-Brain-Setup.dmg](https://github.com/SirCharan/second-brain/releases/latest/download/Second-Brain-Setup.dmg)
+— a 7-step setup wizard that runs the same installer. The app is unsigned: right-click → Open the
+first time, or clear the quarantine flag with
+`xattr -dr com.apple.quarantine "/Applications/Second Brain Setup.app"`.
+
+The full walkthrough lives at
+[charandeepkapoor.com/second-brain/get-started](https://charandeepkapoor.com/second-brain/get-started).
 
 Restart Claude Code afterwards so the hooks load. Then just work normally — sessions are
 captured without you doing anything.
 
-**What it touches.** Five paths, all recorded in `$CLAUDE_MEMORY_DIR/_infra/_install-manifest.json`:
+**What it touches.** Six paths, all recorded in `$CLAUDE_MEMORY_DIR/_infra/_install-manifest.json`:
 `~/.claude/hooks/`, `~/.claude/skills/second-brain/`, `~/.claude/workflows/vault-enrich.js`,
-your vault, and `~/.claude/settings.json` (backed up to `settings.json.bak` first). Existing
+`~/.claude/mcp/`, your vault, and `~/.claude/settings.json` (backed up to `settings.json.bak`
+first). Existing
 hooks and settings are merged, never replaced. Re-run it any time to upgrade. Accepting the
 optional starter pack below adds skill directories under `~/.claude/skills/`, which are recorded
 in the same manifest. The pack's source is installed alongside the skill, so you can add another

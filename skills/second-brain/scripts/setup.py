@@ -16,12 +16,14 @@ Flags:
   --vault PATH        operate on this vault instead of $CLAUDE_MEMORY_DIR
   --pack SPEC         install the starter pack without asking: none, core,
                       "core,writing", or all. install.sh passes this through.
+  --verify-capture    run only the live first-capture test and exit.
 """
 
 import json
 import os
 import subprocess
 import sys
+import time
 
 # Windows defaults to cp1252 for console output AND for open(, encoding="utf-8"), so both printing a status
 # glyph and reading a note containing an emoji raise. Interpreter UTF-8 mode fixes both, and
@@ -167,6 +169,79 @@ def parse_selection(raw, n):
     return {i for i in out if 1 <= i <= n}
 
 
+def _probe(sub, sentinel):
+    """Find <layout>/<sub> in both install modes — doctor.py's hooks-dir probe:
+    $CLAUDE_PLUGIN_ROOT → repo-relative (plugin layout) → ~/.claude."""
+    sd = os.path.dirname(os.path.abspath(__file__))
+    claude = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+    cands = [
+        (
+            os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], sub)
+            if os.environ.get("CLAUDE_PLUGIN_ROOT")
+            else None
+        ),
+        os.path.join(sd, "..", "..", "..", sub),  # plugin layout: scripts → root
+        os.path.join(claude, sub),  # install.sh layout
+    ]
+    return next(
+        (
+            os.path.abspath(p)
+            for p in cands
+            if p and os.path.isfile(os.path.join(p, sentinel))
+        ),
+        None,
+    )
+
+
+def find_mcp_dir():
+    return _probe("mcp", "mcp-setup.py")
+
+
+def first_capture_test(vault):
+    """Pipe a synthetic Stop payload through the installed capture-exchange.py and
+    check today's Daily note grew — the one end-to-end proof the pipeline works."""
+    hooks = _probe("hooks", "_hooklib.py")
+    hook = os.path.join(hooks, "capture-exchange.py") if hooks else None
+    if not hook or not os.path.isfile(hook):
+        print("   ✗ capture-exchange.py not found — re-run install.sh")
+        return 1
+    day = time.strftime("%Y-%m-%d")
+    daily = os.path.join(vault, "Daily", day + ".md")
+    before = os.path.getsize(daily) if os.path.exists(daily) else 0
+    # the timestamp keeps the entry unique, so the hook's dedupe never eats a re-run
+    payload = json.dumps(
+        {
+            "session_id": "sbverify",
+            "cwd": "",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "<!--CAPTURE: setup verification ping "
+            + time.strftime("%H:%M:%S")
+            + " || type: context-->",
+        }
+    )
+    env = dict(os.environ, CLAUDE_MEMORY_DIR=vault)
+    try:
+        subprocess.run(
+            [sys.executable, "-X", "utf8", hook],
+            input=payload,
+            text=True,
+            env=env,
+            timeout=30,
+            check=False,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"   ✗ capture hook failed to run ({e})")
+        return 1
+    after = os.path.getsize(daily) if os.path.exists(daily) else 0
+    if after > before:
+        print(f"   ✓ live capture works — {daily}")
+        return 0
+    doctor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "doctor.py")
+    print(f"   ✗ capture wrote nothing to {daily}")
+    print(f"     diagnose: python3 {doctor} --fix")
+    return 1
+
+
 def manual_steps(vault):
     print(f"""
 {bold("Setup was skipped (no terminal attached).")}
@@ -187,6 +262,11 @@ directory name to a vault folder:
 Both entries point at one folder, so a repo and its web front-end share memory.
 Then check the install:
     python3 ~/.claude/skills/second-brain/scripts/doctor.py
+    python3 ~/.claude/skills/second-brain/scripts/setup.py --verify-capture
+
+Connect Claude Desktop + Cursor to the vault (optional):
+    python3 ~/.claude/mcp/mcp-setup.py --write
+The ChatGPT/claude.ai remote is experimental — see mcp/README.md.
 
 The optional starter pack (skills + vault notes + an Obsidian config) installs with:
     python3 ~/.claude/skills/second-brain/scripts/starter-pack.py --list
@@ -240,6 +320,9 @@ def main():
             pack = a.split("=", 1)[1]
     if pack is not None:
         pack = "" if pack.strip().lower() in ("", "none", "no", "n") else pack.strip()
+
+    if "--verify-capture" in args:
+        return first_capture_test(vault)
 
     interactive = sys.stdin.isatty() and "--non-interactive" not in args
     if not interactive:
@@ -344,10 +427,71 @@ def main():
         print()
         run_starter_pack(vault, pack)
 
-    # --- 5. verify ----------------------------------------------------------
+    # --- 5. MCP clients ------------------------------------------------------
+    mcp_dir = find_mcp_dir()
+    print(f"\n{bold('4. Connect Claude Desktop & Cursor?')}")
+    print(dim("   Exposes the vault to other apps over MCP (local stdio)."))
+    if mcp_dir:
+        mcp_setup = os.path.join(mcp_dir, "mcp-setup.py")
+        yes = False
+        try:
+            yes = ask("   Run mcp-setup.py --write now? [y/N] ").lower().startswith("y")
+        except (EOFError, KeyboardInterrupt):
+            pass
+        if yes:
+            env = dict(os.environ, CLAUDE_MEMORY_DIR=vault)
+            subprocess.run(
+                [sys.executable, "-X", "utf8", mcp_setup, "--write"],
+                env=env,
+                check=False,
+                timeout=120,
+            )
+        else:
+            print(dim(f"   Later: python3 {mcp_setup} --write"))
+    else:
+        print(
+            dim(
+                "   mcp/ not found — from a repo checkout: python3 mcp/mcp-setup.py --write"
+            )
+        )
+
+    # --- 6. ChatGPT / claude.ai remote ---------------------------------------
+    print(f"\n{bold('5. ChatGPT / claude.ai remote? [experimental]')}")
+    print(dim("   Read-only MCP behind a cloudflared tunnel; needs an isolated venv."))
+    if os.name == "nt":
+        print(
+            dim("   Needs bash — not available on native Windows. See mcp/README.md.")
+        )
+    elif not mcp_dir:
+        print(dim("   mcp/ not found — see mcp/README.md in the repo."))
+    else:
+        http_setup = os.path.join(mcp_dir, "mcp-http-setup.sh")
+        run_chatgpt = os.path.join(mcp_dir, "run-chatgpt.sh")
+        yes = False
+        try:
+            yes = ask("   Build the venv now? [y/N] ").lower().startswith("y")
+        except (EOFError, KeyboardInterrupt):
+            pass
+        if yes:
+            try:
+                subprocess.run(["bash", http_setup], check=False, timeout=900)
+            except Exception as e:  # noqa: BLE001 — optional extra, never fail setup
+                print(f"   ! venv build failed ({e}). Re-run: bash {http_setup}")
+            # print-only on purpose: the tunnel is never auto-launched
+            print(f"   Start it yourself when ready:  bash {run_chatgpt}")
+            print(
+                dim(
+                    "   cloudflared then prints the public https URL to paste into ChatGPT."
+                )
+            )
+        else:
+            print(dim(f"   Later: bash {http_setup}   (details in mcp/README.md)"))
+
+    # --- 7. verify ----------------------------------------------------------
+    print(f"\n{bold('6. Checking the install')}")
+    first_capture_test(vault)
     doctor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "doctor.py")
     if os.path.exists(doctor):
-        print(f"\n{bold('4. Checking the install')}")
         env = dict(os.environ, CLAUDE_MEMORY_DIR=vault)
         subprocess.run([sys.executable, "-X", "utf8", doctor], env=env, check=False)
 

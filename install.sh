@@ -98,7 +98,7 @@ command -v claude >/dev/null 2>&1 || echo "  ! Claude Code CLI not found on PATH
 
 echo "second-brain $VERSION → installing into $CLAUDE"
 if [ "$DRY_RUN" = "1" ]; then
-  echo "  (dry run) would copy hooks/, skills/second-brain/, workflows/vault-enrich.js"
+  echo "  (dry run) would copy hooks/, skills/second-brain/, workflows/vault-enrich.js, mcp/"
   echo "  (dry run) would seed vault at $VAULT and register 9 hooks in $SETTINGS"
   if [ -n "$PACK" ]; then
     echo "  (dry run) would offer the starter pack: $PACK"
@@ -125,7 +125,15 @@ cp "$REPO/workflows/vault-enrich.js" "$CLAUDE/workflows/vault-enrich.js"
 if [ -d "$REPO/starter-pack" ]; then
   cp -R "$REPO/starter-pack" "$CLAUDE/skills/second-brain/starter-pack"
 fi
-echo "  ✓ hooks, skill, workflow copied"
+# MCP servers for other clients (Claude Desktop / Cursor / ChatGPT). Optional at
+# runtime, but shipped so mcp-setup.py works without the repo. Tests stay in the repo.
+mkdir -p "$CLAUDE/mcp"
+for f in "$REPO"/mcp/*; do
+  case "$(basename "$f")" in test_*|__pycache__) continue ;; esac
+  cp "$f" "$CLAUDE/mcp/"
+done
+chmod +x "$CLAUDE"/mcp/*.sh
+echo "  ✓ hooks, skill, workflow, mcp copied"
 
 # --- vault ------------------------------------------------------------------
 if [ ! -d "$VAULT" ]; then
@@ -150,6 +158,21 @@ if [ -x /usr/bin/python3 ] && /usr/bin/python3 -c 'import sys; sys.exit(0 if sys
 fi
 "$PY" "$CLAUDE/skills/second-brain/scripts/register-hooks.py" \
   "$SETTINGS" "$VAULT" "$VERSION" --python "$PYPATH"
+
+# register-hooks.py owns the manifest; add mcp/ to its dirs so uninstall removes it too.
+"$PY" - "$VAULT/_infra/_install-manifest.json" "$CLAUDE/mcp" <<'PYEOF'
+import json, sys
+p, mcp = sys.argv[1], sys.argv[2]
+try:
+    m = json.load(open(p, encoding="utf-8"))
+except Exception:
+    raise SystemExit(0)
+if mcp not in m.get("dirs", []):
+    m.setdefault("dirs", []).append(mcp)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(m, f, indent=2)
+        f.write("\n")
+PYEOF
 
 # Persist a non-default vault path, or it is forgotten on the next shell.
 if [ "$VAULT" != "$HOME/.claude/second-brain-vault" ]; then

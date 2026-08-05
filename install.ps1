@@ -107,7 +107,7 @@ if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
 
 Write-Host "second-brain $Version -> installing into $Claude"
 if ($DryRun) {
-    Write-Host "  (dry run) would copy hooks\, skills\second-brain\, workflows\vault-enrich.js"
+    Write-Host "  (dry run) would copy hooks\, skills\second-brain\, workflows\vault-enrich.js, mcp\"
     Write-Host "  (dry run) would seed vault at $Vault and register 9 hooks in $Settings"
     if ($Pack) {
         Write-Host "  (dry run) would offer the starter pack: $Pack"
@@ -135,7 +135,14 @@ Copy-Item (Join-Path $Repo "workflows\vault-enrich.js") -Destination (Join-Path 
 if (Test-Path (Join-Path $Repo "starter-pack")) {
     Copy-Item (Join-Path $Repo "starter-pack") -Destination (Join-Path $skillDst "starter-pack") -Recurse -Force
 }
-Write-Host "  + hooks, skill, workflow copied"
+# MCP servers for other clients (Claude Desktop / Cursor / ChatGPT). Optional at
+# runtime, but shipped so mcp-setup.py works without the repo. Tests stay in the repo.
+$mcpDst = Join-Path $Claude "mcp"
+New-Item -ItemType Directory -Path $mcpDst -Force | Out-Null
+Get-ChildItem -Path (Join-Path $Repo "mcp") -File |
+    Where-Object { $_.Name -notlike "test_*" } |
+    ForEach-Object { Copy-Item $_.FullName -Destination $mcpDst -Force }
+Write-Host "  + hooks, skill, workflow, mcp copied"
 
 # --- vault ------------------------------------------------------------------
 if (-not (Test-Path $Vault)) {
@@ -149,6 +156,21 @@ if (-not (Test-Path $Vault)) {
 
 # --- register hooks + write the install manifest (idempotent) ---------------
 & $PyExe (Join-Path $skillDst "scripts\register-hooks.py") $Settings $Vault $Version --python $PyExe
+
+# register-hooks.py owns the manifest; add mcp\ to its dirs so uninstall removes it too.
+& $PyExe -c @"
+import json, sys
+p, mcp = sys.argv[1], sys.argv[2]
+try:
+    m = json.load(open(p, encoding='utf-8'))
+except Exception:
+    raise SystemExit(0)
+if mcp not in m.get('dirs', []):
+    m.setdefault('dirs', []).append(mcp)
+    with open(p, 'w', encoding='utf-8') as f:
+        json.dump(m, f, indent=2)
+        f.write('\n')
+"@ (Join-Path $Vault "_infra\_install-manifest.json") $mcpDst
 
 # Persist a non-default vault path for future sessions.
 if ($Vault -ne (Join-Path $HOME ".claude\second-brain-vault")) {
