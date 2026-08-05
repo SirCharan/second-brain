@@ -45,6 +45,7 @@ export default function Nav() {
             href={REPO}
             target="_blank"
             rel="noreferrer"
+            aria-label="GitHub repository"
             className="flex items-center gap-2 rounded-lg border border-line-strong bg-surface-2/40 px-3.5 py-1.5 text-sm text-ink transition-colors hover:bg-surface-2"
           >
             <GitHubMark />

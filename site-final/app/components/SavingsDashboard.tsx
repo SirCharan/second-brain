@@ -147,7 +147,7 @@ export default function SavingsDashboard() {
           )}
         </div>
 
-        <p className="mt-8 max-w-3xl text-sm leading-relaxed text-ink-faint">
+        <p className="mt-8 max-w-2xl text-sm leading-relaxed text-ink-faint">
           <span className="text-ink-dim">The math, in the open.</span> Savings are an
           estimate, not a meter: {a.hit_rate * 100}% of sessions assumed to dodge a{" "}
           {tok(a.tokens_per_hit)}-token re-discovery, {a.resume_rate * 100}% to skip{" "}

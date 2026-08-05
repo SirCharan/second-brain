@@ -51,7 +51,10 @@ export default function Footer() {
       </div>
 
       <div className="mt-20 flex items-end justify-center" aria-hidden="true">
-        <span className="translate-y-[0.12em] select-none font-display text-[clamp(3.4rem,18vw,14rem)] leading-none tracking-tight text-ink/[0.07]">
+        <span
+          aria-hidden="true"
+          className="translate-y-[0.12em] select-none font-display text-[clamp(3.4rem,18vw,14rem)] leading-none tracking-tight text-ink/[0.07]"
+        >
           second-brain
         </span>
       </div>

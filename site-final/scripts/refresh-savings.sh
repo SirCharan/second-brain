@@ -24,7 +24,9 @@ fi
 git -C "$HOME/second-brain" pull --rebase --autostash origin main
 git -C "$HOME/second-brain" add site-final/app/data/savings.json
 git -C "$HOME/second-brain" commit -m "data: daily savings point $(date '+%Y-%m-%d')"
-git -C "$HOME/second-brain" push origin main
+# repo is SirCharan; default gh account (ck-delta) 403s. Token fetched at runtime.
+GH_TOKEN_SC="$(gh auth token --user SirCharan)"
+git -C "$HOME/second-brain" push "https://SirCharan:${GH_TOKEN_SC}@github.com/SirCharan/second-brain.git" main
 
 # ck-delta Vercel git auto-deploy is flaky — always deploy explicitly.
 npx vercel --prod --yes --token "$VERCEL_TOKEN_CKDELTA" --scope team_QUgI2tENi0Wo8L7m2s2GoATi
