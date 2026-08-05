@@ -23,7 +23,7 @@ function Spark({ points }: { points: { date: string; net_tokens: number }[] }) {
   if (points.length === 0) return null;
   const max = Math.max(...points.map((p) => p.net_tokens), 1);
   const x = (i: number) =>
-    points.length === 1 ? W / 2 : PAD + (i * (W - PAD * 2)) / (points.length - 1);
+    points.length === 1 ? PAD : PAD + (i * (W - PAD * 2)) / (points.length - 1);
   const y = (v: number) => H - PAD - (v / max) * (H - PAD * 2);
   const line = points.map((p, i) => `${x(i)},${y(p.net_tokens)}`).join(" ");
   const last = points[points.length - 1];
@@ -35,6 +35,15 @@ function Spark({ points }: { points: { date: string; net_tokens: number }[] }) {
       role="img"
       aria-label={`Net tokens saved by day, ${points[0].date} to ${last.date}`}
     >
+      <line
+        x1={PAD}
+        y1={H - PAD}
+        x2={W - PAD}
+        y2={H - PAD}
+        stroke="var(--color-line-strong)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
       {points.length > 1 && (
         <>
           <polygon
