@@ -4,6 +4,7 @@ import PromiseStrip from "./components/PromiseStrip";
 import WorksWith from "./components/WorksWith";
 import ContextTax from "./components/ContextTax";
 import TokenTax from "./components/TokenTax";
+import SavingsDashboard from "./components/SavingsDashboard";
 import Values from "./components/Values";
 import Compare from "./components/Compare";
 import Footer from "./components/Footer";
@@ -21,6 +22,7 @@ export default function Home() {
         <WorksWith />
         <ContextTax />
         <TokenTax />
+        <SavingsDashboard />
         <Values />
         <Compare />
       </main>

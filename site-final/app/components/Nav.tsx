@@ -30,6 +30,12 @@ export default function Nav() {
             Context tax
           </a>
           <a
+            href="#saved"
+            className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink md:inline"
+          >
+            Saved
+          </a>
+          <a
             href="#compare"
             className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink sm:inline"
           >

@@ -1,0 +1,33 @@
+{
+  "computed_at": "2026-08-05T10:19:50.774Z",
+  "since": "2026-07-06",
+  "sessions": 1150,
+  "turns": 971,
+  "notes": 902,
+  "throughput_tokens": 186323714,
+  "gross_saved_tokens": 9315000,
+  "injection_cost_tokens": 1998400,
+  "net_saved_tokens": 7316600,
+  "usd_saved": 36.58,
+  "pct_of_throughput": 3.9,
+  "assumptions": {
+    "bytes_per_token": 4,
+    "hit_rate": 0.25,
+    "tokens_per_hit": 20000,
+    "resume_rate": 0.175,
+    "tokens_per_resume": 10000,
+    "compaction_rate": 0.045,
+    "tokens_per_compaction": 30000,
+    "inject_per_session": 7000,
+    "inject_per_turn": 2000,
+    "cache_mult": 0.2,
+    "usd_per_mtok": 5
+  },
+  "history": [
+    {
+      "date": "2026-08-05",
+      "net_tokens": 7316600,
+      "usd": 36.58
+    }
+  ]
+}

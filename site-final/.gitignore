@@ -6,3 +6,5 @@ dist
 *.log
 .env*
 .DS_Store
+scripts/refresh-savings.log
+scripts/refresh-savings.launchd.log
