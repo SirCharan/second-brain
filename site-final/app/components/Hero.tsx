@@ -44,7 +44,8 @@ export default function Hero() {
                   "linear-gradient(to top, var(--color-bg) 0%, rgba(12,10,9,0.35) 12%, transparent 36%)",
                 ].join(", ")
               : [
-                  "linear-gradient(to right, rgba(12,10,9,0.88) 0%, rgba(12,10,9,0.62) 28%, rgba(12,10,9,0.22) 48%, transparent 62%)",
+                  // stops reach ~50% because the CTA block runs to 44rem, wider than the copy column
+                  "linear-gradient(to right, rgba(12,10,9,0.9) 0%, rgba(12,10,9,0.72) 34%, rgba(12,10,9,0.4) 52%, transparent 70%)",
                   "linear-gradient(to top, var(--color-bg) 0%, rgba(12,10,9,0.5) 14%, transparent 42%)",
                 ].join(", "),
           }}
@@ -77,8 +78,8 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* outside the 34rem copy column: 42rem keeps the command one line at desktop */}
-          <div className="pointer-events-auto mt-9 max-w-[42rem]">
+          {/* outside the 34rem copy column: 44rem keeps the install command on one line at desktop */}
+          <div className="pointer-events-auto mt-9 max-w-[44rem]">
               <CopyCommand command={INSTALL} />
               <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-ink-faint">
                 <a

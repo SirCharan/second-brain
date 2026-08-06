@@ -24,7 +24,7 @@ export default function CopyCommand({
   return (
     <button
       onClick={copy}
-      className="group flex w-full items-start gap-3 rounded-md border border-line bg-surface/70 px-4 py-3 text-left font-mono text-xs leading-relaxed text-ink transition-colors hover:border-line-strong hover:bg-surface-2/70 sm:text-sm"
+      className="group flex w-full items-start gap-2.5 rounded-md border border-line bg-surface/95 px-3 py-3 text-left font-mono text-xs leading-relaxed text-ink transition-colors hover:border-line-strong hover:bg-surface-2/95 sm:text-sm"
     >
       <span className="select-none pt-px text-accent">{prompt}</span>
       <code className="min-w-0 flex-1 break-words">{command}</code>

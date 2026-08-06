@@ -16,8 +16,8 @@ export default function Footer() {
           Install once, keep working. The vault grows under you.
         </p>
 
-        {/* 42rem so the one-line install command stays one line at desktop */}
-        <div className="mt-8 max-w-[42rem]">
+        {/* 44rem so the install command stays on one line at desktop */}
+        <div className="mt-8 max-w-[44rem]">
           <CopyCommand command={INSTALL} />
         </div>
 
