@@ -1,4 +1,3 @@
-import Link from "next/link";
 import CopyCommand from "./CopyCommand";
 import { GitHubMark } from "./Mark";
 
@@ -14,10 +13,11 @@ export default function Footer() {
           Own your mind. <span className="text-accent">Rent the model.</span>
         </p>
         <p className="mt-4 max-w-md text-[15px] leading-relaxed text-ink-dim">
-          Install the plugin, keep working. The vault grows under you.
+          Install once, keep working. The vault grows under you.
         </p>
 
-        <div className="mt-8 max-w-md">
+        {/* 42rem so the one-line install command stays one line at desktop */}
+        <div className="mt-8 max-w-[42rem]">
           <CopyCommand command={INSTALL} />
         </div>
 
@@ -26,7 +26,7 @@ export default function Footer() {
             href={REPO}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-2 transition-colors hover:text-ink"
+            className="flex items-center gap-2 py-1.5 transition-colors hover:text-ink"
           >
             <GitHubMark size={15} />
             GitHub
@@ -35,13 +35,14 @@ export default function Footer() {
             href={`${REPO}/blob/main/POSITIONING.md`}
             target="_blank"
             rel="noreferrer"
-            className="transition-colors hover:text-ink"
+            className="py-1.5 transition-colors hover:text-ink"
           >
             Why we built it
           </a>
-          <Link href="/get-started" className="transition-colors hover:text-ink">
+          {/* plain <a>: cross-page nav through the Multi-Zone proxy — next/link prefetch 404s (?_rsc=) */}
+          <a href="/second-brain/get-started" className="py-1.5 transition-colors hover:text-ink">
             Install guide
-          </Link>
+          </a>
           <span className="text-ink-faint">Apache-2.0</span>
         </div>
       </div>

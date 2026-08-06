@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Mark, GitHubMark } from "./Mark";
 
 const REPO = "https://github.com/SirCharan/second-brain";
@@ -17,37 +16,33 @@ export default function Nav() {
   return (
     <nav className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">
       <div className="flex w-full max-w-6xl items-center justify-between rounded-2xl border border-line bg-surface/55 py-2.5 pl-4 pr-2.5 backdrop-blur-md">
-        <Link href="/#top" className="flex items-center gap-2.5">
+        <a href="/second-brain/#top" className="flex items-center gap-2.5">
           <Mark />
           <span className="font-display text-lg leading-none tracking-tight">
             second-brain
           </span>
-        </Link>
+        </a>
         <div className="flex items-center gap-1 sm:gap-1.5">
-          <Link
-            href="/#context"
+          <a href="/second-brain/#context"
             className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink md:inline"
           >
             Context tax
-          </Link>
-          <Link
-            href="/#saved"
+          </a>
+          <a href="/second-brain/#saved"
             className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink md:inline"
           >
             Saved
-          </Link>
-          <Link
-            href="/#compare"
+          </a>
+          <a href="/second-brain/#compare"
             className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink sm:inline"
           >
             Compare
-          </Link>
-          <Link
-            href="/get-started"
+          </a>
+          <a href="/second-brain/get-started"
             className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-dim transition-colors hover:text-ink sm:inline"
           >
             Get started
-          </Link>
+          </a>
           <a
             href={REPO}
             target="_blank"

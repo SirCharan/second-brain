@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer";
 import CopyCommand from "../components/CopyCommand";
@@ -179,12 +178,12 @@ export default function GetStarted() {
 
         <section className="border-t border-line px-6 py-14 sm:px-10">
           <div className="mx-auto max-w-6xl">
-            <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-sm text-ink-dim">
+            <div className="flex flex-wrap items-center gap-x-7 gap-y-1 text-sm text-ink-dim">
               <a
                 href={REPO}
                 target="_blank"
                 rel="noreferrer"
-                className="transition-colors hover:text-ink"
+                className="py-1.5 transition-colors hover:text-ink"
               >
                 GitHub
               </a>
@@ -192,13 +191,14 @@ export default function GetStarted() {
                 href={`${REPO}/blob/main/POSITIONING.md`}
                 target="_blank"
                 rel="noreferrer"
-                className="transition-colors hover:text-ink"
+                className="py-1.5 transition-colors hover:text-ink"
               >
                 Why we built it
               </a>
-              <Link href="/" className="transition-colors hover:text-ink">
+              {/* plain <a>: cross-page nav through the Multi-Zone proxy — next/link prefetch 404s (?_rsc=) */}
+              <a href="/second-brain/" className="py-1.5 transition-colors hover:text-ink">
                 ← back home
-              </Link>
+              </a>
             </div>
           </div>
         </section>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import GraphField from "./GraphField";
 import CopyCommand from "./CopyCommand";
 import { GitHubMark } from "./Mark";
@@ -75,36 +74,38 @@ export default function Hero() {
                 second-brain captures every AI session into Markdown on your machine.
                 Switch models, clear the window, close the laptop. Nothing walks away.
               </p>
-
-              <div className="pointer-events-auto mt-9">
-                <CopyCommand command={INSTALL} />
-                <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-faint">
-                  <a
-                    href={DMG}
-                    className="text-ink-dim transition-colors hover:text-ink"
-                  >
-                    Download for Mac (.dmg)
-                  </a>
-                  <Link
-                    href="/get-started"
-                    className="text-ink-dim transition-colors hover:text-ink"
-                  >
-                    Get started →
-                  </Link>
-                  <a
-                    href={REPO}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 text-ink-dim transition-colors hover:text-ink"
-                  >
-                    <GitHubMark size={15} />
-                    Star on GitHub
-                  </a>
-                  <span>Apache-2.0</span>
-                </div>
-              </div>
             </div>
           </div>
+
+          {/* outside the 34rem copy column: 42rem keeps the command one line at desktop */}
+          <div className="pointer-events-auto mt-9 max-w-[42rem]">
+              <CopyCommand command={INSTALL} />
+              <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-ink-faint">
+                <a
+                  href={DMG}
+                  className="py-1.5 text-ink-dim transition-colors hover:text-ink"
+                >
+                  Download for Mac (.dmg)
+                </a>
+                {/* plain <a>: cross-page nav through the Multi-Zone proxy — next/link prefetch 404s (?_rsc=) */}
+                <a
+                  href="/second-brain/get-started"
+                  className="py-1.5 text-ink-dim transition-colors hover:text-ink"
+                >
+                  Get started →
+                </a>
+                <a
+                  href={REPO}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 py-1.5 text-ink-dim transition-colors hover:text-ink"
+                >
+                  <GitHubMark size={15} />
+                  Star on GitHub
+                </a>
+                <span className="py-1.5">Apache-2.0</span>
+              </div>
+            </div>
         </div>
       )}
     </section>
