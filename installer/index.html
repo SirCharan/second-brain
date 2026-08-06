@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Second Brain Setup</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="top">
+        <p class="eyebrow">local-first memory for Claude Code</p>
+        <h1 class="font-display">Second Brain Setup</h1>
+        <p class="lede">
+          Seven quiet steps. Your sessions land in a Markdown vault on this Mac.
+        </p>
+      </header>
+
+      <section class="vault-bar" aria-label="Vault location">
+        <label for="vault-path">Vault folder</label>
+        <div class="vault-row">
+          <input
+            id="vault-path"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <button type="button" id="btn-browse" class="btn ghost">Browse</button>
+        </div>
+      </section>
+
+      <ol class="steps" id="steps">
+        <!-- 1 -->
+        <li class="step" data-step="1" id="step-1">
+          <div class="step-head">
+            <span class="num">1</span>
+            <div class="step-copy">
+              <h2>Check your machine</h2>
+              <p class="muted">Claude Code, git, and python3.</p>
+            </div>
+            <button type="button" id="btn-check" class="btn primary">Check</button>
+          </div>
+          <ul class="prereq-list" id="prereq-list" hidden></ul>
+          <p class="step-note warn" id="plugin-warning" hidden></p>
+          <p class="step-note" id="prereq-note" hidden></p>
+        </li>
+
+        <!-- 2 -->
+        <li class="step" data-step="2" id="step-2">
+          <div class="step-head">
+            <span class="num">2</span>
+            <div class="step-copy">
+              <h2>Install</h2>
+              <p class="muted">Copies hooks into Claude Code and seeds the vault.</p>
+            </div>
+            <button type="button" id="btn-install" class="btn primary" disabled>
+              Run
+            </button>
+          </div>
+          <pre class="log" id="log-install" aria-live="polite" hidden></pre>
+        </li>
+
+        <!-- 3 -->
+        <li class="step" data-step="3" id="step-3">
+          <div class="step-head">
+            <span class="num">3</span>
+            <div class="step-copy">
+              <h2>Track your projects</h2>
+              <p class="muted">
+                Apply the defaults here, or pick projects one by one in Terminal.
+              </p>
+            </div>
+            <div class="btn-pair">
+              <button type="button" id="btn-setup" class="btn primary" disabled>
+                Run
+              </button>
+              <button type="button" id="btn-terminal" class="btn" disabled>
+                Finish in Terminal
+              </button>
+            </div>
+          </div>
+          <pre class="log" id="log-setup" aria-live="polite" hidden></pre>
+          <p class="step-note" id="setup-note" hidden></p>
+        </li>
+
+        <!-- 4 -->
+        <li class="step" data-step="4" id="step-4">
+          <div class="step-head">
+            <span class="num">4</span>
+            <div class="step-copy">
+              <h2>Connect apps <span class="muted">(optional)</span></h2>
+              <p class="muted">Wire the MCP server into Claude Desktop + Cursor.</p>
+            </div>
+            <button type="button" id="btn-mcp" class="btn primary" disabled>
+              Set up
+            </button>
+          </div>
+          <pre class="log" id="log-mcp" aria-live="polite" hidden></pre>
+          <p class="step-note" id="mcp-note" hidden></p>
+        </li>
+
+        <!-- 5 -->
+        <li class="step" data-step="5" id="step-5">
+          <div class="step-head">
+            <span class="num">5</span>
+            <div class="step-copy">
+              <h2>ChatGPT remote <span class="muted">(experimental)</span></h2>
+              <p class="muted">
+                Optional and read-only. Nothing runs here — copy these into a
+                terminal if you want it.
+              </p>
+            </div>
+          </div>
+          <div class="cmd-list">
+            <div class="cmd-row">
+              <code>bash mcp/mcp-http-setup.sh</code>
+              <button type="button" class="btn ghost btn-copy" data-copy="bash mcp/mcp-http-setup.sh">
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>bash mcp/run-chatgpt.sh</code>
+              <button type="button" class="btn ghost btn-copy" data-copy="bash mcp/run-chatgpt.sh">
+                Copy
+              </button>
+            </div>
+          </div>
+          <p class="step-note">
+            Run both from the <code>~/second-brain</code> folder. The endpoint only
+            reads your vault — it can't write to it. Details in
+            <code>mcp/README.md</code>.
+          </p>
+        </li>
+
+        <!-- 6 -->
+        <li class="step" data-step="6" id="step-6">
+          <div class="step-head">
+            <span class="num">6</span>
+            <div class="step-copy">
+              <h2>Obsidian</h2>
+              <p class="muted">Optional, but the nicest way to browse the vault.</p>
+            </div>
+            <div class="btn-pair">
+              <button type="button" id="btn-obsidian" class="btn primary" disabled>
+                Install
+              </button>
+              <button type="button" id="btn-open" class="btn" disabled>
+                Open vault
+              </button>
+            </div>
+          </div>
+          <pre class="log" id="log-obsidian" aria-live="polite" hidden></pre>
+          <p class="step-note" id="obsidian-note" hidden></p>
+        </li>
+
+        <!-- 7 -->
+        <li class="step" data-step="7" id="step-7">
+          <div class="step-head">
+            <span class="num">7</span>
+            <div class="step-copy">
+              <h2>Done</h2>
+              <p class="muted">
+                Restart Claude Code (or open a new session) so the hooks load.
+              </p>
+            </div>
+          </div>
+          <p class="step-note">
+            First steps, what gets captured, and how recall works:
+            <a
+              href="https://charandeepkapoor.com/second-brain/get-started"
+              data-external="https://charandeepkapoor.com/second-brain/get-started"
+              >charandeepkapoor.com/second-brain/get-started</a
+            >
+          </p>
+        </li>
+      </ol>
+
+      <section class="done" id="done" hidden>
+        <h2 class="font-display">You're set.</h2>
+        <p>Start a Claude Code session — it remembers now.</p>
+        <p class="muted small">
+          Restart Claude Code (or open a new session) so the hooks load.
+        </p>
+      </section>
+    </div>
+  </body>
+</html>
