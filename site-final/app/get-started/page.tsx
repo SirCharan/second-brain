@@ -31,7 +31,8 @@ function Step({
   return (
     <section className="border-t border-line px-6 py-14 sm:px-10 sm:py-16">
       <div className="mx-auto max-w-6xl">
-        <div className="max-w-2xl">
+        {/* 44rem fits the install command on one line; prose keeps a 2xl reading measure */}
+        <div className="max-w-[44rem] [&>p]:max-w-2xl">
           <p className="font-mono text-[11px] tracking-[0.18em] text-accent uppercase">
             {n} · {kicker}
           </p>
