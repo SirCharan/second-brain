@@ -1,10 +1,10 @@
 {
-  "computed_at": "2026-08-10T03:41:31.721Z",
+  "computed_at": "2026-08-11T03:35:42.193Z",
   "since": "2026-07-06",
   "sessions": 961,
   "turns": 1050,
   "notes": 1009,
-  "throughput_tokens": 190830917,
+  "throughput_tokens": 190834295,
   "gross_saved_tokens": 7784100,
   "injection_cost_tokens": 1765400,
   "net_saved_tokens": 6018700,
@@ -51,6 +51,11 @@
     },
     {
       "date": "2026-08-10",
+      "net_tokens": 6018700,
+      "usd": 30.09
+    },
+    {
+      "date": "2026-08-11",
       "net_tokens": 6018700,
       "usd": 30.09
     }
