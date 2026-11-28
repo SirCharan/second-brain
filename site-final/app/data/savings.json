@@ -1,14 +1,14 @@
 {
-  "computed_at": "2026-11-27T03:30:02.248Z",
+  "computed_at": "2026-11-28T04:26:37.209Z",
   "since": "2026-07-06",
-  "sessions": 2157,
-  "turns": 7381,
-  "notes": 8044,
-  "throughput_tokens": 950239473,
-  "gross_saved_tokens": 17471700,
-  "injection_cost_tokens": 5972200,
-  "net_saved_tokens": 11499500,
-  "usd_saved": 57.5,
+  "sessions": 2181,
+  "turns": 7444,
+  "notes": 8143,
+  "throughput_tokens": 967970434,
+  "gross_saved_tokens": 17666100,
+  "injection_cost_tokens": 6031000,
+  "net_saved_tokens": 11635100,
+  "usd_saved": 58.18,
   "pct_of_throughput": 1.2,
   "assumptions": {
     "bytes_per_token": 4,
@@ -473,6 +473,11 @@
       "date": "2026-11-27",
       "net_tokens": 11499500,
       "usd": 57.5
+    },
+    {
+      "date": "2026-11-28",
+      "net_tokens": 11635100,
+      "usd": 58.18
     }
   ]
 }
